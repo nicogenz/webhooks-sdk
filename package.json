@@ -63,10 +63,10 @@
     "prepublishOnly": "npm run clean && npm run build"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.0",
-    "publint": "^0.3.0",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "@biomejs/biome": "2.5.10",
+    "publint": "0.3.24",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
   },
   "repository": {
     "type": "git",
