@@ -1,6 +1,6 @@
 {
   "name": "webhooks-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One way to verify, parse, and route webhooks from every provider.",
   "keywords": [
     "webhook",
@@ -75,7 +75,7 @@
   "bugs": {
     "url": "https://github.com/nicogenz/webhooks-sdk/issues"
   },
-  "homepage": "https://github.com/nicogenz/webhooks-sdk#readme",
+  "homepage": "https://webhooks-sdk.com",
   "publishConfig": {
     "access": "public",
     "provenance": true
