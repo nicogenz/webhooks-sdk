@@ -7,7 +7,7 @@ bugs, not correctness bugs.
 ## Reporting a vulnerability
 
 **Do not open a public issue.** Report privately through
-[GitHub Security Advisories](https://github.com/OWNER/webhooks-sdk/security/advisories/new).
+[GitHub Security Advisories](https://github.com/nicogenz/webhooks-sdk/security/advisories/new).
 
 Expect an acknowledgement within 72 hours and an assessment within 7 days. If a
 fix is warranted, a patched version is published before the advisory is made
