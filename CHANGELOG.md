@@ -1,0 +1,58 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
+follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Core: `createWebhookHandler`, `WebhookRouter`, the normalized `WebhookEvent`
+  envelope, and a typed error taxonomy with HTTP status mapping.
+- Providers: Stripe, GitHub, Discord (interactions and webhook events), and
+  Standard Webhooks — the last covering every Svix-backed vendor, with named
+  wrappers for Resend, Clerk, Polar, and Replicate.
+- `createHmacProvider` and the scheme primitives (`resolveSecrets`,
+  `assertWithinTolerance`, `matchesAnyHmac`), so an HMAC-based integration is a
+  description rather than an implementation.
+- Twilio provider (`webhooks-sdk/twilio`) — the first canonical-string scheme
+  (family 7): HMAC-SHA1 over the public endpoint URL plus sorted form
+  parameters, with a `url` option for proxied deployments and support for the
+  JSON `bodySHA256` flow. The scheme signs no timestamp, so pair it with an
+  idempotency store.
+- Google Pub/Sub push provider (`webhooks-sdk/google-pubsub`) — the first
+  JWT/JWKS scheme (family 5): verifies the OIDC bearer token against Google's
+  keys with audience, issuer, expiry, and service-account checks, and unwraps
+  the base64 envelope so Gmail, Play RTDN, and Workspace events arrive decoded.
+- JWT and key-set primitives for the rest of families 5 and 6: `decodeJwt`,
+  `verifyJwtSignature`, `createRemoteKeySet` (cached JWKS with
+  rotation-triggered refresh), `staticKeySet`, and the `KeyUnavailableError`
+  code `key_unavailable` — a 500, because an unreachable JWKS is an outage on
+  the receiving side, not evidence about the request.
+- `digest`/`digestHex` and `toBase64Url` crypto helpers.
+- `HmacProviderConfig.content` may now return a promise, so a scheme can fold
+  an async digest into the signed string.
+- Framework adapters for Next.js, Hono, Express, and bare `node:http`.
+- `webhooks-sdk/testing`: request builder and event recorder.
+- Idempotency store interface with an in-memory implementation.
+- Provider-declared handshake ordering via `signedHandshake`.
+
+### Security
+
+- Digest comparison is timing-safe and runs over decoded bytes, so hex casing
+  and base64 padding cannot cause a false mismatch. Both the secret and
+  candidate loops run to completion, so the number of configured secrets is not
+  observable through response timing.
+- Malformed hex or base64 decodes to empty and compares as *unequal*, rather
+  than two undecodable values comparing as equal.
+- JWT verification pins the algorithm before touching key material (Google
+  Pub/Sub accepts RS256 only) and supports no symmetric JWS algorithms at all,
+  foreclosing `alg: none` and HS256-against-a-public-key confusion attacks.
+- Twilio's JSON flow substitutes the received body's SHA-256 into the signed
+  URL instead of comparing hashes separately, so tampering fails the one
+  timing-safe HMAC comparison rather than a second ad-hoc check.
+- Deduplication is skipped when an event id is blank. A collapsed
+  `provider:` key would otherwise let the first delivery suppress every
+  later one — and a suppressed duplicate is acknowledged with a 200, so the
+  provider would never retry.

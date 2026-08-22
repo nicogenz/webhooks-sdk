@@ -1,0 +1,77 @@
+---
+title: GitHub
+description: HMAC over the raw body via X-Hub-Signature-256 — pair it with an idempotency store for replay protection.
+---
+
+GitHub signs each delivery with HMAC-SHA256 over the raw body,
+hex-encoded as `sha256=…` in `X-Hub-Signature-256` ([scheme family
+1](/docs/providers#scheme-families)). This covers repository, organization, and
+GitHub App webhooks.
+
+```ts
+import { createWebhookHandler, memoryIdempotencyStore } from 'webhooks-sdk'
+import { github } from 'webhooks-sdk/github'
+
+const handler = createWebhookHandler({
+  provider: github({ secret: process.env.GITHUB_WEBHOOK_SECRET! }),
+  idempotency: memoryIdempotencyStore(),
+  on: {
+    push: async (event) => await deploy(event.payload),
+    pull_request: async (event) => await triage(event.payload),
+  },
+})
+
+export const POST = handler.fetch
+```
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The webhook secret you set on the hook. Array for [rotation](/docs/guides/secret-rotation). |
+
+## No timestamp — bring a store
+
+GitHub signs the body alone: the signature proves *who* sent the request
+but not *when*, so the same bytes replayed later verify perfectly. Add an
+[idempotency store](/docs/concepts/idempotency) — with GitHub it doubles as
+replay protection.
+
+That's also why `event.id` is a **digest of the signed body**, not the
+`X-GitHub-Delivery` GUID: the GUID lives in an unsigned header, so a replay
+could mint a fresh one and walk straight past id-based deduplication. The
+delivery GUID stays available for logging:
+
+```ts
+on: {
+  push: async (event) => {
+    log('delivery', event.raw.header('x-github-delivery'))
+  },
+}
+```
+
+:::note[The legacy SHA-1 header is rejected]
+GitHub still sends the deprecated `X-Hub-Signature` (SHA-1) alongside the
+SHA-256 header. This provider deliberately verifies only
+`X-Hub-Signature-256`.
+:::
+
+## The envelope
+
+- `event.type` — from the `X-GitHub-Event` header (`push`, `pull_request`,
+  `issues`, `workflow_run`, …). Common names autocomplete; any string routes.
+- `event.timestamp` — receipt time; GitHub sends none on the wire.
+- `event.payload` — GitHub's payload, untouched.
+
+## Standalone & testing
+
+```ts
+import {
+  verifyGitHubWebhook,  // (raw, { secret }) — throws on failure
+  parseGitHubWebhook,   // (raw) — the envelope
+  signGitHubWebhook,    // (body, secret) — a valid header value, for tests
+} from 'webhooks-sdk/github'
+```
+
+See [Standalone verification](/docs/guides/standalone-verification) and
+[Testing](/docs/guides/testing).

@@ -1,0 +1,97 @@
+---
+title: Google Pub/Sub
+description: OIDC JWT verified against Google's JWKS — with the push envelope unwrapped so events arrive as events.
+---
+
+Google Cloud Pub/Sub **push**
+authenticates with an OIDC JWT in `Authorization: Bearer`, verified against
+Google's rotating JWKS ([scheme family 5](/docs/providers#scheme-families)) with
+issuer, audience, expiry, and service-account checks. Because Gmail push,
+Google Play RTDN, and Workspace Events all deliver through Pub/Sub, this one
+provider covers them all.
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { googlePubSub } from 'webhooks-sdk/google-pubsub'
+
+const handler = createWebhookHandler({
+  provider: googlePubSub({
+    audience: 'https://example.com/webhooks/pubsub',
+    serviceAccountEmail: 'push-invoker@my-project.iam.gserviceaccount.com',
+  }),
+  on: {
+    message: async (event) => {
+      const notification = event.payload.message.json()
+      await handle(notification)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `audience` | `string \| string[]` | — **(required)** | The `aud` claim configured on the push subscription. |
+| `serviceAccountEmail` | `string \| string[]` | — **(required)** | The invoker service account(s) allowed to call you. |
+| `keys` | `Jwk[] \| KeySet` | Google's JWKS, cached | Pin keys, or plug in your own cache. |
+| `fetch` | `typeof fetch` | global `fetch` | Override for proxies or tests. |
+| `tolerance` | `number` | `300` | Clock skew allowed on `exp`/`iat`, in seconds. |
+| `eventType` | `string \| ((payload) => string \| undefined)` | `'message'` | Derive the event name — a string names a message *attribute*. |
+
+:::warning[Both options are required on purpose]
+`audience` is never defaulted from the request URL — behind a proxy that
+value is attacker-influenceable. And audiences aren't secrets, so without
+the `serviceAccountEmail` check anyone could point *their own* push
+subscription at your endpoint and deliver validly-signed junk.
+:::
+
+## The envelope is unwrapped for you
+
+Pub/Sub wraps every message in a push envelope with base64-encoded data.
+The provider unwraps it: `event.payload.message` carries the decoded bytes
+with `text()` and `json()` accessors, plus `messageId`, `publishTime`,
+`attributes`, and `orderingKey`. A Gmail or Play event reaches your handler
+as an event, not as an envelope.
+
+- `event.id` — the Pub/Sub `messageId`, stable across redelivery, so
+  [idempotency](/docs/concepts/idempotency) works out of the box.
+- `event.timestamp` — the message's `publishTime`.
+- `event.type` — `'message'` by default. Route on an attribute instead with
+  `eventType: 'type'`, or derive: `eventType: (p) => p.message.attributes.kind`.
+
+## No handshake, but a deadline
+
+Pub/Sub sends no setup challenge — it just expects a 2xx before the
+subscription's ack deadline, and redelivers otherwise. Keep handlers fast;
+if the work is slow, enqueue it and return.
+
+## Key caching
+
+The provider fetches Google's JWKS once and caches it — honoring
+`Cache-Control`, refreshing when an unknown key id arrives (rate-limited),
+and falling back to the last good keys if a refresh fails. When Google is
+unreachable and nothing is cached, verification fails with
+`key_unavailable` (a 500) — deliberately **not** `invalid_signature`,
+because it's an outage, not an attack.
+
+Pass `keys` to pin JWKs (great for tests) or to supply your own `KeySet`
+backed by shared storage.
+
+## Standalone & testing
+
+```ts
+import {
+  verifyGooglePubSubWebhook,  // (raw, options) — throws on failure
+  parseGooglePubSubWebhook,   // (raw, { eventType? }) — the envelope
+  signGooglePubSubWebhook,    // (privateKey, options) — the Authorization header, for tests
+} from 'webhooks-sdk/google-pubsub'
+```
+
+Prefer the provider over `verifyGooglePubSubWebhook` in long-running
+processes — the standalone function builds a fresh key set (and JWKS fetch)
+per call unless you pass pinned `keys`. See
+[Testing](/docs/guides/testing#the-signing-helpers) for generating a test key
+pair.

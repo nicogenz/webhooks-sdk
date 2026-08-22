@@ -1,0 +1,110 @@
+---
+title: Build a custom provider
+description: Most providers are a description, not an implementation — createHmacProvider supplies the rest.
+---
+
+Most providers are a *description*, not an implementation. Scheme families
+1, 2, and 3 are one algorithm with four parameters — which headers carry the
+signature, how the digest is encoded, what string was signed, and how the
+secret is decoded. `createHmacProvider` supplies everything else: the replay
+window, secret rotation, multiple candidate signatures, constant-time
+comparison, and the error taxonomy.
+
+:::tip[Check Standard Webhooks first]
+If the vendor sends `webhook-id` / `webhook-timestamp` / `webhook-signature`
+headers (or the older `svix-*` generation), you don't need a custom provider
+at all — use the [generic Standard Webhooks
+provider](/docs/providers/standard-webhooks) with your own `id`.
+:::
+
+## A body-HMAC provider in full
+
+Family 1 — `HMAC(secret, rawBody)` in a single header:
+
+```ts
+import { createHmacProvider, MissingSignatureError } from 'webhooks-sdk'
+
+export function acme(options: { secret: string | string[] }) {
+  return createHmacProvider({
+    id: 'acme',
+    name: 'Acme',
+    secret: options.secret,
+    encoding: 'hex',
+    extract: (raw) => {
+      const header = raw.header('x-acme-signature')
+      if (!header) throw new MissingSignatureError('Missing x-acme-signature')
+      return { candidates: [header] }
+    },
+    content: (_material, raw) => raw.text(),
+    event: (raw) => {
+      const payload = raw.json<{ id: string; event: string; sent_at: number }>()
+      return {
+        id: payload.id,
+        provider: 'acme',
+        type: payload.event,
+        timestamp: new Date(payload.sent_at * 1000),
+        payload,
+        raw,
+      }
+    },
+  })
+}
+```
+
+The pieces:
+
+| Option | Role |
+|--------|------|
+| `id` / `name` | Machine id and display name for the provider. |
+| `secret` | Shared secret — a single string or an array for [rotation](/docs/guides/secret-rotation). |
+| `encoding` | How the digest is encoded in the header: `'hex'` or `'base64'`. |
+| `extract` | Pull the candidate signature(s) — and the timestamp, if the scheme has one — out of the request. |
+| `content` | Build the exact string the provider signed. |
+| `event` | Map the verified request to the [event envelope](/docs/concepts/event-envelope). |
+
+## Adding a timestamp (family 2)
+
+Return the timestamp from `extract`, fold it into `content`, and set a
+`tolerance` (seconds) to enforce the replay window:
+
+```ts
+tolerance: 300,
+extract: (raw) => {
+  const { t, v1 } = parseAcmeHeader(raw.header('x-acme-signature'))
+  return { candidates: v1, timestamp: t }
+},
+content: (material, raw) => `${material.timestamp}.${raw.text()}`,
+```
+
+A request whose timestamp falls outside the tolerance fails with
+`timestamp_out_of_tolerance` before any handler runs.
+
+## When the scheme isn't an HMAC
+
+Reach past `createHmacProvider` only when the scheme genuinely is not an
+HMAC over a string — asymmetric signatures, certificate chains, JWTs. Those
+still compose from the same pieces (`resolveSecrets`,
+`assertWithinTolerance`, `matchesAnyHmac`), which is how the
+Standard Webhooks provider supports both a symmetric `v1` and an Ed25519
+`v1a` branch.
+
+## Testing your provider
+
+Write a `signAcmeWebhook` helper alongside the provider so tests can produce
+real signatures — a test that stubs the verifier tests nothing. Cover at
+least:
+
+- a valid signature
+- the wrong secret
+- a body tampered with after signing
+- a missing header
+- a stale timestamp, where the scheme signs one
+
+See [Testing](/docs/guides/testing) for the request-building utilities.
+
+:::note[Contributing it back]
+A provider PR needs the factory in `src/providers/<id>/index.ts`, the
+signing helper, the tests above, and a subpath entry in
+`package.json#exports`. Verify against the provider's live documentation —
+it is the source of truth.
+:::

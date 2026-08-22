@@ -1,0 +1,116 @@
+---
+title: Quickstart
+description: Install the SDK and handle your first webhook.
+sidebar:
+  order: 2
+---
+
+## Install
+
+```package-install
+npm i webhooks-sdk
+```
+
+No other dependencies. The SDK uses Web Crypto and `fetch` only, so it runs
+unchanged on Node 22+, Cloudflare Workers, Deno, and Bun.
+
+## Create a handler
+
+<Steps>
+  <Step title="Import a provider">
+    Each provider lives on its own subpath, so your bundle only carries the
+    schemes you use:
+
+    ```ts
+    import { createWebhookHandler } from 'webhooks-sdk'
+    import { stripe } from 'webhooks-sdk/stripe'
+    ```
+  </Step>
+  <Step title="Wire up your event handlers">
+    Keys in `on` are the provider's native event names:
+
+    ```ts
+    const handler = createWebhookHandler({
+      provider: stripe({ secret: process.env.STRIPE_WEBHOOK_SECRET! }),
+      on: {
+        'payment_intent.succeeded': async (event) => {
+          await fulfill(event.payload.data.object)
+        },
+        'customer.subscription.deleted': async (event) => {
+          await revoke(event.payload.data.object)
+        },
+      },
+    })
+    ```
+  </Step>
+  <Step title="Mount it">
+    `handler.fetch` is a `(request: Request) => Promise<Response>` function —
+    mount it anywhere that speaks the Web platform:
+
+    ```ts app/api/webhooks/stripe/route.ts
+    export const POST = handler.fetch
+    ```
+  </Step>
+</Steps>
+
+That's the whole integration. The handler verifies the signature, enforces the
+replay window, parses the body, and dispatches to your `on` handlers. It
+returns `401` on a bad signature, `400` on a malformed request, `500` if your
+handler throws (so the provider retries), and `200` otherwise.
+
+## Other frameworks
+
+<Tabs>
+  <Tab title="Hono">
+    ```ts
+    import { toHonoHandler } from 'webhooks-sdk/hono'
+
+    app.post('/webhooks/stripe', toHonoHandler(handler))
+    ```
+  </Tab>
+  <Tab title="Express">
+    ```ts
+    import express from 'express'
+    import { toExpressHandler } from 'webhooks-sdk/express'
+
+    // Raw on the webhook path only; JSON everywhere else.
+    app.post('/webhooks/stripe', express.raw({ type: '*/*' }), toExpressHandler(handler))
+    app.use(express.json())
+    ```
+  </Tab>
+  <Tab title="Node http">
+    ```ts
+    import { toNodeHandler } from 'webhooks-sdk/node'
+
+    server.on('request', toNodeHandler(handler))
+    ```
+  </Tab>
+  <Tab title="Workers / Deno / Bun">
+    ```ts
+    export default { fetch: handler.fetch }
+    ```
+  </Tab>
+</Tabs>
+
+:::warning[Express needs the raw body]
+Signature schemes sign the exact bytes on the wire. If `express.json()` runs
+before the webhook route, verification fails. Mount the webhook route before
+any JSON parser — see [Why the raw body matters](/docs/concepts/raw-body).
+:::
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Handle duplicates" href="/docs/concepts/idempotency" icon="copy">
+    Providers deliver at-least-once. Add an idempotency store.
+  </Card>
+  <Card title="Route many providers" href="/docs/guides/routing" icon="split">
+    One endpoint for Stripe, GitHub, and everything else.
+  </Card>
+  <Card title="Test it" href="/docs/guides/testing" icon="flask-conical">
+    Sign fixtures with the real algorithm instead of mocking the verifier.
+  </Card>
+  <Card title="Browse providers" href="/docs/providers" icon="plug">
+    Setup notes and options for every shipped provider.
+  </Card>
+</CardGroup>

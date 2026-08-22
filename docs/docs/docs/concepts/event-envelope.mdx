@@ -1,0 +1,53 @@
+---
+title: The event envelope
+description: A normalized wrapper around every webhook — with the provider's payload left untouched.
+---
+
+Every event your handlers receive has the same shape above `payload`,
+regardless of provider:
+
+```ts
+{
+  id: 'evt_1abc',                    // used for idempotency
+  provider: 'stripe',
+  type: 'payment_intent.succeeded',  // provider-native name
+  timestamp: Date,
+  payload: { … },                    // the provider's own body, untouched
+  raw: { headers, body, method, url, header(), text(), json() },
+}
+```
+
+| Field | What it is |
+|-------|------------|
+| `id` | The provider's delivery/event id. Feeds the [idempotency store](/docs/concepts/idempotency). |
+| `provider` | The provider's id (`'stripe'`, `'github'`, …). Useful when one handler serves a [router](/docs/guides/routing). |
+| `type` | The provider-native event name — `payment_intent.succeeded`, `push`, `INTERACTION_CREATE`. Exactly what the provider calls it, from wherever the provider puts it (body field or header). |
+| `timestamp` | When the provider says the event happened, as a `Date`. |
+| `payload` | The provider's own body, parsed but not reshaped. |
+| `raw` | The verified request: `headers`, the body bytes, and lazy `text()` / `json()` accessors. |
+
+## Why `payload` stays provider-native
+
+A Stripe `PaymentIntent` and a GitHub push have nothing in common, and
+flattening them into a shared shape would lose information without buying
+much. You already know which provider you're integrating; what you want is
+that provider's documented payload, not a lossy abstraction over it.
+
+A cross-provider `semantic` view for the domains where it genuinely fits —
+payments, git, messaging — is planned as an opt-in layer, not a replacement.
+
+## Typed payloads
+
+Providers ship event maps, so handlers narrow by event name:
+
+```ts
+createWebhookHandler({
+  provider: stripe({ secret }),
+  on: {
+    // event.payload is typed from the event name
+    'payment_intent.succeeded': async (event) => {
+      event.payload.data.object // PaymentIntent
+    },
+  },
+})
+```

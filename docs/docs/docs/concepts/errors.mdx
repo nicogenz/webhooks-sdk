@@ -1,0 +1,87 @@
+---
+title: Errors & outcomes
+description: Failures are returned, not thrown — every result carries an outcome, and every error a code and status.
+---
+
+`handler.process()` never throws. Every delivery produces a `WebhookResult`:
+
+```ts
+const result = await handler.process(request)
+
+result.ok       // boolean
+result.outcome  // 'handled' | 'unhandled' | 'duplicate' | 'handshake' | 'failed'
+result.event    // present whenever verification succeeded
+result.error    // present when something went wrong
+result.response // present when outcome is 'handshake'
+```
+
+| Outcome | Meaning |
+|---------|---------|
+| `handled` | Verified, and at least one handler ran. |
+| `unhandled` | Verified, but nothing was registered for `event.type`. |
+| `duplicate` | Suppressed by the [idempotency store](/docs/concepts/idempotency). |
+| `handshake` | A setup challenge was answered; no event was dispatched. |
+| `failed` | Rejected before dispatch, or a handler threw. |
+
+When you mount `handler.fetch` instead, the mapping to HTTP is automatic: a
+handshake `Response` passes through verbatim, an error becomes
+`{ error, message, provider }` JSON with the error's status, and everything
+else returns `200`.
+
+:::note[Unhandled events return 200 on purpose]
+A non-2xx would make the provider retry — and eventually disable your
+endpoint — over event types you simply don't subscribe to in code.
+:::
+
+## The error taxonomy
+
+Every failure is a `WebhookError` carrying a `code`, an HTTP `status`, the
+`provider` id, and an `isVerificationFailure` flag:
+
+| Class | `code` | Status | Verification failure? | Meaning |
+|-------|--------|--------|-----------------------|---------|
+| `MissingSignatureError` | `missing_signature` | 400 | ✅ | No signature header, or a malformed one. |
+| `SignatureVerificationError` | `invalid_signature` | 401 | ✅ | Signature present but didn't match. |
+| `TimestampToleranceError` | `timestamp_out_of_tolerance` | 400 | ✅ | Signed timestamp outside the replay window. |
+| `PayloadParseError` | `invalid_payload` | 400 | ❌ | Body verified but unreadable as an event. |
+| `ConfigurationError` | `invalid_configuration` | 500 | ❌ | Missing secret, malformed key, missing Twilio URL — your bug, surfaced loudly. |
+| `KeyUnavailableError` | `key_unavailable` | 500 | ❌ | Remote JWKS/cert unfetchable — an outage, deliberately *not* a verification failure. |
+| `DuplicateEventError` | `duplicate_event` | 200 | ❌ | Already processed; acknowledged so the provider stops redelivering. |
+| `UnknownProviderError` | `unknown_provider` | 404 | ❌ | The [router](/docs/guides/routing) couldn't resolve a provider. |
+| `HandlerError` | `handler_failed` | 500 | ❌ | Your handler threw; the delivery itself was genuine, so the provider retries. |
+
+All classes are exported from the root, along with an `isWebhookError(value)`
+guard. `isVerificationFailure` is the flag to alert on: a burst of `true`
+means someone is probing your endpoint or a secret is wrong; `false` codes
+are operational.
+
+## Observing failures
+
+`onError` runs for every failure — including suppressed duplicates — with
+the error and, when available, the raw request:
+
+```ts
+createWebhookHandler({
+  provider: stripe({ secret }),
+  onError: (error, raw) => {
+    metrics.increment(`webhook.${error.code}`)
+    if (error.isVerificationFailure) alertSecurity(error, raw?.header('user-agent'))
+  },
+  on: { /* … */ },
+})
+```
+
+A throw inside `onError` is swallowed — observability can never mask the
+original failure.
+
+## Handler errors retry by design
+
+When one of your handlers throws, the result is `failed` with a
+`HandlerError` (status `500`), and — because the store only remembers an
+event *after* successful dispatch — the provider's retry re-runs your
+handler instead of being swallowed as a duplicate. Transient failures heal
+themselves; persistent ones keep surfacing until you fix them.
+
+Standalone functions are the exception to "never throws":
+`verifyStripeWebhook` and friends throw these same error classes directly —
+see [Standalone verification](/docs/guides/standalone-verification).

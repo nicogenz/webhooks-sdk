@@ -1,0 +1,76 @@
+---
+title: One route, many providers
+description: Serve Stripe, GitHub, and everything else from a single endpoint with WebhookRouter.
+---
+
+Once you're past one or two integrations, per-provider routes stop scaling.
+`WebhookRouter` serves any number of providers from one endpoint:
+
+```ts
+import { WebhookRouter } from 'webhooks-sdk'
+import { stripe } from 'webhooks-sdk/stripe'
+import { github } from 'webhooks-sdk/github'
+
+const router = new WebhookRouter({
+  providers: {
+    stripe: stripe({ secret: process.env.STRIPE_SECRET! }),
+    github: github({ secret: process.env.GITHUB_SECRET! }),
+  },
+})
+
+router.on('stripe', 'charge.refunded', handleRefund)
+router.on('github', 'push', handlePush)
+```
+
+Mount it on a catch-all route:
+
+```ts app/api/webhooks/[provider]/route.ts
+export const POST = router.fetch
+```
+
+Now `POST /api/webhooks/stripe` verifies and dispatches with the Stripe
+provider, `POST /api/webhooks/github` with the GitHub one.
+
+## How the provider is chosen
+
+By default the router takes the provider key from the **last path segment**
+of the request URL. Override with `resolve` when your URLs don't follow that
+shape:
+
+```ts
+const router = new WebhookRouter({
+  providers: { /* … */ },
+  resolve: (request) =>
+    new URL(request.url).searchParams.get('source') ?? undefined,
+})
+```
+
+A request that resolves to no known provider gets a `404` with
+`{ error: 'unknown_provider' }` — nothing is verified or dispatched.
+(`router.on()` with an unknown key throws immediately instead, so a typo
+fails at startup, not at delivery time.)
+
+:::tip[Keys are yours, ids are the provider's]
+The keys in `providers` are your route segments. They usually match the
+provider id, but nothing requires it — `internal-billing: stripe({ … })`
+works, and routes as `/webhooks/internal-billing`.
+:::
+
+## Shared options
+
+Secrets, tolerances, and modes are set where each provider is constructed.
+Cross-cutting concerns live on the router and apply to every provider:
+
+```ts
+const router = new WebhookRouter({
+  providers: { /* … */ },
+  idempotency: memoryIdempotencyStore(), // one store, keys namespaced per provider
+  onEvent: (event) => log(event.provider, event.type),
+  onError: (error) => report(error),
+})
+```
+
+`onEvent`, `onUnhandled`, `onError`, `tolerance`, and `now` behave exactly
+as they do on [`createWebhookHandler`](/docs/concepts/errors#observing-failures).
+Idempotency keys are prefixed with the provider id, so one store safely
+serves all providers.

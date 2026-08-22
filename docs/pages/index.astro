@@ -1,0 +1,509 @@
+---
+// Landing page: full-width marketing page in Blume's chrome (header, theme,
+// fonts) via PageLayout — no sidebar, no TOC.
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import { Code } from "astro:components";
+import data from "blume:data";
+import { brandIcon } from "../components/brand-icons.ts";
+
+export const prerender = true;
+
+const stripeExample = `import { createWebhookHandler } from 'webhooks-sdk'
+import { stripe } from 'webhooks-sdk/stripe'
+
+const handler = createWebhookHandler({
+  provider: stripe({ secret: env.STRIPE_SECRET }),
+  on: {
+    'payment_intent.succeeded': async (event) => {
+      await fulfill(event.payload.data.object)
+    },
+  },
+})
+
+export const POST = handler.fetch`;
+
+const githubExample = `import { createWebhookHandler } from 'webhooks-sdk'
+import { github } from 'webhooks-sdk/github'
+
+const handler = createWebhookHandler({
+  provider: github({ secret: env.GITHUB_SECRET }),
+  on: {
+    push: async (event) => {
+      await deploy(event.payload)
+    },
+  },
+})
+
+export const POST = handler.fetch`;
+
+const discordExample = `import { createWebhookHandler } from 'webhooks-sdk'
+import { discord } from 'webhooks-sdk/discord'
+
+const handler = createWebhookHandler({
+  provider: discord({ publicKey: env.DISCORD_PUBLIC_KEY }),
+  on: {
+    application_command: async (event) => {
+      await runCommand(event.payload)
+    },
+  },
+})
+
+export const POST = handler.fetch`;
+
+const routerExample = `const router = new WebhookRouter({
+  providers: {
+    stripe: stripe({ secret: env.STRIPE_SECRET }),
+    github: github({ secret: env.GITHUB_SECRET }),
+    resend: resend({ secret: env.RESEND_SECRET }),
+  },
+})
+
+// app/api/webhooks/[provider]/route.ts
+export const POST = router.fetch`;
+
+const testExample = `import { createWebhookRequest } from 'webhooks-sdk/testing'
+import { signStripeWebhook } from 'webhooks-sdk/stripe'
+
+const request = createWebhookRequest({
+  body,
+  headers: {
+    'stripe-signature': await signStripeWebhook(body, secret),
+  },
+})
+
+// the real verification path — no mocks
+await handler.process(request)`;
+
+const examples = [
+  { id: "stripe", label: "Stripe", code: stripeExample },
+  { id: "github", label: "GitHub", code: githubExample },
+  { id: "discord", label: "Discord", code: discordExample },
+];
+
+const features = [
+  {
+    title: "Verification done right",
+    body: "Constant-time comparison, replay windows, and multi-secret rotation — the subtle bugs that fail quietly, handled once.",
+    href: "/docs/concepts/errors",
+  },
+  {
+    title: "Handshakes answered",
+    body: "Signed and unsigned setup challenges answered in the right order — Discord's invalid-signature probe gets its 401.",
+    href: "/docs/concepts/handshakes",
+  },
+  {
+    title: "Idempotency built in",
+    body: "Providers deliver at-least-once. Duplicates are suppressed and acknowledged — plug in memory, Redis, or KV.",
+    href: "/docs/concepts/idempotency",
+  },
+  {
+    title: "The raw-body trap, avoided",
+    body: "Signatures cover the exact bytes on the wire. The SDK reads them once — and the adapters keep body parsers away.",
+    href: "/docs/concepts/raw-body",
+  },
+  {
+    title: "Test with real signatures",
+    body: "Every provider ships a signing helper, so tests exercise the actual verification path instead of mocking it.",
+    href: "/docs/guides/testing",
+  },
+  {
+    title: "Runs everywhere",
+    body: "Zero dependencies — Web Crypto and fetch only. The same code on Node 22+, Cloudflare Workers, Deno, and Bun.",
+    href: "/docs/quickstart",
+  },
+];
+
+const marquee = [
+  { name: "Stripe", icon: "stripe" },
+  { name: "GitHub", icon: "github" },
+  { name: "Discord", icon: "discord" },
+  { name: "Twilio", icon: "twilio" },
+  { name: "Google Pub/Sub", icon: "google-pubsub" },
+  { name: "Resend", icon: "resend" },
+  { name: "Clerk", icon: "clerk" },
+  { name: "Replicate", icon: "replicate" },
+  { name: "OpenAI", icon: "openai" },
+  { name: "Loops", icon: "loops" },
+  { name: "Dodo Payments", icon: "dodo-payments" },
+].map((item) => ({ ...item, svg: brandIcon(item.icon) }));
+
+const adapters = [
+  { name: "Web-standard", code: "export const POST = handler.fetch" },
+  { name: "Next.js", code: "export const { POST } = toNextRoute(handler)" },
+  { name: "Hono", code: "app.post('/hook', toHonoHandler(handler))" },
+  { name: "Express", code: "app.post('/hook', raw, toExpressHandler(handler))" },
+  { name: "Node http", code: "createServer(toNodeHandler(handler))" },
+];
+
+const codeTheme = "github-dark-default";
+---
+
+<PageLayout
+  site={{ title: data.config.title, description: data.config.description }}
+  logo={data.config.logo}
+  favicon={data.config.favicon}
+  appleIcon={data.config.appleIcon}
+  banner={data.config.banner}
+  analytics={data.config.analytics}
+  navigation={data.navigation}
+  page={{
+    title: "webhooks-sdk — every webhook, one handler",
+    description: data.config.description,
+    route: "/",
+  }}
+  themeMode={data.config.theme.mode}
+  fontCssVars={data.fontCssVars}
+  searchEnabled={data.config.search.enabled}
+  ui={data.ui}
+>
+  <div class="mx-auto w-full max-w-6xl px-6">
+    <!-- Hero -->
+    <section class="flex flex-col items-center gap-6 pt-20 pb-16 text-center sm:pt-28">
+      <p class="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+        Zero dependencies · Web Crypto only · Node 22+, Workers, Deno, Bun
+      </p>
+      <h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-6xl">
+        Every webhook.<br />One handler.
+      </h1>
+      <p class="max-w-2xl text-base text-muted-foreground sm:text-lg">
+        webhooks-sdk verifies, parses, and routes webhooks from every provider.
+        Signature schemes, replay windows, setup handshakes, and duplicate
+        deliveries — the parts that fail quietly — handled once, correctly.
+      </p>
+      <div class="flex flex-col items-center gap-4 sm:flex-row">
+        <a
+          href="/docs/quickstart"
+          class="rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+        >
+          Get started
+        </a>
+        <a
+          href="/docs/providers"
+          class="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          Browse providers
+        </a>
+      </div>
+      <button
+        type="button"
+        data-copy-install
+        class="group mt-2 inline-flex items-center gap-3 rounded-md border border-border bg-muted px-4 py-2 font-mono text-sm text-foreground transition-colors hover:border-accent"
+        title="Copy to clipboard"
+      >
+        <span class="select-none text-muted-foreground">$</span>
+        <span>npm install webhooks-sdk</span>
+        <span data-copy-label class="text-xs text-muted-foreground group-hover:text-accent">copy</span>
+      </button>
+    </section>
+
+    <!-- Provider marquee -->
+    <section class="border-t border-border py-10">
+      <p class="mb-7 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        Shipping today — plus any Standard Webhooks vendor, no wrapper needed
+      </p>
+      <div class="lp-marquee" role="img" aria-label="Provider logos: Stripe, GitHub, Discord, Twilio, Google Pub/Sub, Resend, Clerk, Replicate, OpenAI, Loops, Dodo Payments">
+        <div class="lp-marquee-track">
+          <div class="lp-marquee-half">
+            {marquee.map((item) => (
+              <span class="lp-marquee-item">
+                <span class="lp-marquee-icon" set:html={item.svg} />
+                {item.name}
+              </span>
+            ))}
+          </div>
+          <div class="lp-marquee-half" aria-hidden="true">
+            {marquee.map((item) => (
+              <span class="lp-marquee-item">
+                <span class="lp-marquee-icon" set:html={item.svg} />
+                {item.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p class="mt-7 text-center">
+        <a href="/docs/providers" class="text-sm text-accent hover:underline">
+          ~90 providers across 9 signature families →
+        </a>
+      </p>
+    </section>
+
+    <!-- Code showcase -->
+    <section class="border-t border-border py-16">
+      <div class="grid items-start gap-10 lg:grid-cols-[1fr_1.2fr]">
+        <div class="flex flex-col gap-4">
+          <h2 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Swap the provider.<br />Keep the handler.
+          </h2>
+          <p class="text-muted-foreground">
+            Every provider invented its own signature scheme, replay window,
+            and setup handshake. The differences are real but almost never
+            interesting — so the SDK absorbs them behind one contract.
+          </p>
+          <ul class="flex flex-col gap-2.5 text-sm text-muted-foreground">
+            <li class="flex gap-2.5">
+              <span class="mt-0.5 text-accent">✓</span>
+              Signature verified against the exact bytes on the wire
+            </li>
+            <li class="flex gap-2.5">
+              <span class="mt-0.5 text-accent">✓</span>
+              Replay window enforced, secrets rotate as arrays
+            </li>
+            <li class="flex gap-2.5">
+              <span class="mt-0.5 text-accent">✓</span>
+              <span><code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">401</code> bad signature · <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">400</code> malformed · <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">500</code> handler threw, so the provider retries</span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="mt-0.5 text-accent">✓</span>
+              Typed, provider-native payloads — no lossy abstraction
+            </li>
+          </ul>
+        </div>
+        <div class="min-w-0 rounded-xl border border-border bg-[#0d1117] shadow-sm">
+          <div class="flex items-center gap-1 border-b border-white/10 px-3 pt-3 pb-0" role="tablist" aria-label="Provider examples">
+            {examples.map((example, i) => (
+              <button
+                type="button"
+                role="tab"
+                id={`tab-${example.id}`}
+                aria-controls={`panel-${example.id}`}
+                aria-selected={i === 0 ? "true" : "false"}
+                data-lp-tab={example.id}
+                class="rounded-t-md px-3.5 py-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80 aria-selected:border-b-2 aria-selected:border-accent aria-selected:text-white"
+              >
+                {example.label}
+              </button>
+            ))}
+          </div>
+          {examples.map((example, i) => (
+            <div
+              role="tabpanel"
+              id={`panel-${example.id}`}
+              aria-labelledby={`tab-${example.id}`}
+              data-lp-panel={example.id}
+              class:list={["overflow-x-auto p-4 text-sm [&_pre]:!bg-transparent", { hidden: i !== 0 }]}
+            >
+              <Code code={example.code} lang="ts" theme={codeTheme} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature grid -->
+    <section class="border-t border-border py-16">
+      <h2 class="mb-2 text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        The uninteresting parts, done correctly
+      </h2>
+      <p class="mx-auto mb-10 max-w-2xl text-center text-muted-foreground">
+        A verification bug looks exactly like "the webhook didn't fire". These
+        are the details the SDK exists for.
+      </p>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature) => (
+          <a
+            href={feature.href}
+            class="group flex flex-col gap-2 rounded-xl border border-border p-5 transition-colors hover:border-accent hover:bg-muted"
+          >
+            <h3 class="font-medium text-foreground">{feature.title}</h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">{feature.body}</p>
+            <span class="mt-auto pt-1 text-sm text-accent opacity-0 transition-opacity group-hover:opacity-100">
+              Learn more →
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Router + testing -->
+    <section class="grid gap-4 border-t border-border py-16 lg:grid-cols-2">
+      <div class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-6">
+        <h3 class="text-lg font-medium text-foreground">One route, many providers</h3>
+        <p class="text-sm text-muted-foreground">
+          <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">WebhookRouter</code>
+          serves any number of providers from a single endpoint — the provider
+          is picked from the URL.
+        </p>
+        <div class="min-w-0 overflow-x-auto rounded-lg bg-[#0d1117] p-4 text-sm [&_pre]:!bg-transparent">
+          <Code code={routerExample} lang="ts" theme={codeTheme} />
+        </div>
+        <a href="/docs/guides/routing" class="text-sm text-accent hover:underline">Routing guide →</a>
+      </div>
+      <div class="flex min-w-0 flex-col gap-4 rounded-xl border border-border p-6">
+        <h3 class="text-lg font-medium text-foreground">Tests that test something</h3>
+        <p class="text-sm text-muted-foreground">
+          A test that mocks verification tests nothing. Sign fixtures with the
+          real algorithm and run the whole pipeline.
+        </p>
+        <div class="min-w-0 overflow-x-auto rounded-lg bg-[#0d1117] p-4 text-sm [&_pre]:!bg-transparent">
+          <Code code={testExample} lang="ts" theme={codeTheme} />
+        </div>
+        <a href="/docs/guides/testing" class="text-sm text-accent hover:underline">Testing guide →</a>
+      </div>
+    </section>
+
+    <!-- Adapters -->
+    <section class="border-t border-border py-16">
+      <h2 class="mb-2 text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        Mount it anywhere
+      </h2>
+      <p class="mx-auto mb-10 max-w-2xl text-center text-muted-foreground">
+        The native interface is a Web-standard
+        <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">(Request) =&gt; Response</code>
+        — adapters cover the platforms that don't speak it.
+      </p>
+      <div class="mx-auto flex max-w-3xl flex-col gap-2">
+        {adapters.map((adapter) => (
+          <div class="flex flex-col gap-1 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+            <span class="w-32 shrink-0 text-sm font-medium text-foreground">{adapter.name}</span>
+            <code class="overflow-x-auto font-mono text-xs text-muted-foreground sm:text-sm">{adapter.code}</code>
+          </div>
+        ))}
+      </div>
+      <p class="mt-6 text-center">
+        <a href="/docs/guides/frameworks" class="text-sm text-accent hover:underline">
+          Framework adapters →
+        </a>
+      </p>
+    </section>
+
+    <!-- Nine families band -->
+    <section class="border-t border-border py-16">
+      <div class="mx-auto flex max-w-3xl flex-col items-center gap-4 rounded-2xl border border-border bg-muted px-6 py-12 text-center">
+        <p class="text-4xl font-semibold text-foreground">9 families · ~90 providers</p>
+        <p class="max-w-xl text-muted-foreground">
+          Most "bespoke" signature schemes aren't. Nine families cover almost
+          every provider — and once a family ships, each new provider is a
+          header name, an encoding, and a test fixture.
+        </p>
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <a
+            href="/docs/providers"
+            class="rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+          >
+            See the scheme families
+          </a>
+          <a
+            href="/docs/providers/custom"
+            class="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-background"
+          >
+            Build a provider
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer slot="footer" class="border-t border-border">
+    <div class="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-muted-foreground sm:flex-row">
+      <p>webhooks-sdk · MIT License</p>
+      <nav class="flex gap-6">
+        <a href="/docs" class="transition-colors hover:text-foreground">Documentation</a>
+        <a href="/docs/quickstart" class="transition-colors hover:text-foreground">Quickstart</a>
+        <a href="/docs/providers" class="transition-colors hover:text-foreground">Providers</a>
+      </nav>
+    </div>
+  </footer>
+</PageLayout>
+
+<style>
+  .lp-marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12%,
+      black 88%,
+      transparent
+    );
+  }
+
+  .lp-marquee-track {
+    display: flex;
+    width: max-content;
+    animation: lp-marquee-scroll 36s linear infinite;
+  }
+
+  .lp-marquee:hover .lp-marquee-track {
+    animation-play-state: paused;
+  }
+
+  .lp-marquee-half {
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+    padding-right: 3rem;
+  }
+
+  .lp-marquee-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    white-space: nowrap;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-muted-foreground);
+  }
+
+  .lp-marquee-icon {
+    display: inline-flex;
+  }
+
+  .lp-marquee-icon :global(svg) {
+    width: 22px;
+    height: 22px;
+  }
+
+  @keyframes lp-marquee-scroll {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lp-marquee-track {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  // Delegated on document so the handlers survive ClientRouter view-transition
+  // swaps, which replace the DOM without re-running identical inline scripts.
+  const w = window as typeof window & { lpHandlersAttached?: boolean };
+  if (!w.lpHandlersAttached) {
+    w.lpHandlersAttached = true;
+    document.addEventListener("click", async (event) => {
+      const target = event.target as HTMLElement | null;
+
+      // Provider example tabs.
+      const tab = target?.closest<HTMLElement>("[data-lp-tab]");
+      if (tab) {
+        for (const other of document.querySelectorAll<HTMLElement>("[data-lp-tab]")) {
+          other.setAttribute("aria-selected", other === tab ? "true" : "false");
+        }
+        for (const panel of document.querySelectorAll<HTMLElement>("[data-lp-panel]")) {
+          panel.classList.toggle("hidden", panel.dataset.lpPanel !== tab.dataset.lpTab);
+        }
+        return;
+      }
+
+      // Copy-to-clipboard on the install command.
+      const install = target?.closest<HTMLElement>("[data-copy-install]");
+      if (install) {
+        try {
+          await navigator.clipboard.writeText("npm install webhooks-sdk");
+          const label = install.querySelector("[data-copy-label]");
+          if (label) {
+            label.textContent = "copied!";
+            setTimeout(() => {
+              label.textContent = "copy";
+            }, 2000);
+          }
+        } catch {
+          // Clipboard unavailable (permissions, insecure context) — leave the label alone.
+        }
+      }
+    });
+  }
+</script>

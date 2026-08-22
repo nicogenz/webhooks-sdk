@@ -1,0 +1,54 @@
+---
+title: Why the raw body matters
+description: Every signature scheme signs the exact bytes on the wire — parse first and verification breaks.
+---
+
+Every signature scheme signs the exact bytes on the wire. Parse the body and
+re-serialize it and the signature no longer matches, because key order,
+whitespace, and unicode escaping all changed. This is the single most common
+cause of "verification randomly fails".
+
+```ts
+// What the provider signed:
+'{"id":"evt_1","amount":1000}'
+
+// What JSON.parse → JSON.stringify gives you back — maybe:
+'{"amount":1000,"id":"evt_1"}'
+// Same object. Different bytes. Signature check fails.
+```
+
+The failure is intermittent by nature: it only shows up when the round-trip
+changes the bytes, so it looks like the provider is flaky rather than like a
+bug on your side.
+
+## What the SDK does about it
+
+The SDK takes the **request**, not your parsed object, and reads the body once
+as bytes. Everything downstream — verification, parsing, your handlers — works
+from that single read. In Web-standard runtimes (Next.js App Router, Workers,
+Deno, Bun, Hono) there is nothing to configure; `handler.fetch` receives the
+untouched `Request`.
+
+## The Express footgun
+
+Express is the one place you have to be careful, because `express.json()`
+consumes and re-parses the stream before your route ever runs. Mount the
+webhook route *before* any JSON parser, with a raw body:
+
+```ts
+import express from 'express'
+import { toExpressHandler } from 'webhooks-sdk/express'
+
+// Raw on the webhook path only; JSON everywhere else.
+app.post('/webhooks/stripe', express.raw({ type: '*/*' }), toExpressHandler(handler))
+app.use(express.json())
+```
+
+If you can't reorder middleware, use `captureRawBody` from
+`webhooks-sdk/express` — see [Framework adapters](/docs/guides/frameworks).
+
+:::tip[Your handlers still get parsed JSON]
+Skipping the JSON parser on the webhook route costs you nothing: the
+[event envelope](/docs/concepts/event-envelope) hands your handler the parsed
+`payload` along with `raw.text()` and `raw.json()` accessors.
+:::

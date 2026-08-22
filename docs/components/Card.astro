@@ -1,0 +1,13 @@
+---
+// Wraps Blume's Card so `icon` can name a provider brand (stripe, github,
+// discord, …). Brand names resolve to inline SVG from brand-icons.ts — which
+// the built-in Icon renders as-is — and everything else falls through to the
+// built-in Lucide names unchanged.
+import BlumeCard from "blume/components/content/Card.astro";
+import { brandIcon } from "./brand-icons.ts";
+
+const { icon, ...rest } = Astro.props;
+const resolved = typeof icon === "string" ? (brandIcon(icon) ?? icon) : icon;
+---
+
+<BlumeCard {...rest} icon={resolved}><slot /></BlumeCard>

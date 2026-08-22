@@ -1,0 +1,77 @@
+---
+title: Idempotency
+description: Duplicate deliveries are routine, not an edge case. Suppress them with a store.
+---
+
+Providers retry on non-2xx, and several deliver at-least-once even when you
+succeed. Duplicate deliveries are routine, not an edge case — any handler
+that charges a card or sends an email needs to be safe against seeing the
+same event twice.
+
+```ts
+import { createWebhookHandler, memoryIdempotencyStore } from 'webhooks-sdk'
+
+const handler = createWebhookHandler({
+  provider: stripe({ secret }),
+  idempotency: memoryIdempotencyStore(),
+  on: { /* … */ },
+})
+```
+
+With a store configured, a redelivered event is suppressed before dispatch
+and the result reports `outcome: 'duplicate'`.
+
+:::note[A suppressed duplicate returns 200, not an error]
+Rejecting a duplicate would make the provider redeliver it forever. The
+correct answer to "I've seen this before" is "yes, thanks, all good".
+:::
+
+## How suppression works
+
+The store is keyed on `` `${provider.id}:${event.id}` ``, and an event is
+only remembered **after** your handlers succeed — so a delivery that failed
+mid-handler is re-run on retry instead of being acknowledged as a duplicate.
+An event whose provider supplies no usable id skips deduplication entirely
+rather than collapsing every delivery onto one key.
+
+The in-memory store takes tuning options:
+
+```ts
+memoryIdempotencyStore({
+  ttlMs: 24 * 60 * 60 * 1000, // default: 24 hours
+  maxSize: 10_000,            // default: oldest evicted first
+})
+```
+
+A day's TTL is plenty — retry windows are hours, not weeks.
+
+## The in-memory store is single-process
+
+`memoryIdempotencyStore()` suits one long-lived process. On serverless or
+across several instances, each instance keeps its own map and catches
+nothing. There, implement the two-method `IdempotencyStore` interface over
+shared storage — Redis, a KV namespace, a Durable Object:
+
+```ts
+import type { IdempotencyStore } from 'webhooks-sdk'
+
+const redisStore: IdempotencyStore = {
+  async seen(key) {
+    return (await redis.exists(`webhook:${key}`)) === 1
+  },
+  async remember(key, ttlMs) {
+    await redis.set(`webhook:${key}`, '1', { PX: ttlMs ?? 24 * 60 * 60 * 1000 })
+  },
+}
+```
+
+## Replay protection for body-only HMACs
+
+Some schemes (GitHub's, for one) sign the body alone: the signature proves
+*who* sent the request but not *when*, so the same bytes replayed a week
+later verify perfectly. For those providers the store doubles as replay
+protection, keyed on a digest of the signed body — not on the delivery id,
+which lives in an unsigned header a replay could mint fresh.
+
+See [scheme families](/docs/providers#scheme-families) for which providers need
+this.

@@ -1,0 +1,77 @@
+---
+title: Standalone verification
+description: The router is optional — verify and parse without a handler.
+---
+
+The handler is optional. When you want the check and nothing else — inside
+an existing framework, a queue consumer, or middleware you already own —
+every provider exports standalone `verify` and `parse` functions:
+
+```ts
+import { toRawWebhook } from 'webhooks-sdk'
+import { verifyStripeWebhook, parseStripeWebhook } from 'webhooks-sdk/stripe'
+
+const raw = await toRawWebhook(request)
+await verifyStripeWebhook(raw, { secret })  // throws WebhookError on failure
+const event = parseStripeWebhook(raw)
+```
+
+Unlike `handler.process()`, the standalone functions **throw** on failure —
+the [same error classes](/docs/concepts/errors#the-error-taxonomy), with the same
+codes and statuses.
+
+## `toRawWebhook`
+
+Verification needs the exact bytes on the wire, so everything starts by
+normalizing your input into a `RawWebhook`:
+
+```ts
+const raw = await toRawWebhook(input)
+```
+
+`input` can be:
+
+- a Web-standard `Request` (cloned; the body is read once as bytes)
+- an existing `RawWebhook` (passed through)
+- a plain object: `{ headers, body, method?, url? }` — headers as a
+  `Headers` instance or a plain record, body as a string, `Uint8Array`, or
+  `ArrayBuffer`
+
+The result is frozen and exposes `headers`, `body` (bytes), `method`, `url`,
+plus `header(name)`, `text()`, and `json()` accessors.
+
+## Per-provider functions
+
+| Provider | Verify | Parse |
+|----------|--------|-------|
+| Stripe | `verifyStripeWebhook(raw, { secret, tolerance? })` | `parseStripeWebhook(raw)` |
+| GitHub | `verifyGitHubWebhook(raw, { secret })` | `parseGitHubWebhook(raw)` |
+| Discord | `verifyDiscordWebhook(raw, { publicKey, mode?, tolerance? })` | `parseDiscordWebhook(raw, options)` |
+| Twilio | `verifyTwilioWebhook(raw, { authToken, url? })` | `parseTwilioWebhook(raw)` |
+| Google Pub/Sub | `verifyGooglePubSubWebhook(raw, options)` | `parseGooglePubSubWebhook(raw, options?)` |
+| Standard Webhooks | `verifyStandardWebhook(raw, options)` | `parseStandardWebhook(raw, options?)` |
+
+Options are identical to the corresponding provider factory.
+
+:::warning[Prefer the provider for Google Pub/Sub]
+`googlePubSub()` builds its JWKS cache once for the provider's lifetime.
+The standalone `verifyGooglePubSubWebhook()` builds a fresh key set per
+call — a remote fetch each time unless you pass pinned `keys`. In a
+long-running process, construct the provider and call `provider.verify`
+instead.
+:::
+
+## What standalone mode skips
+
+Only verification and parsing run. You give up the handler's replay-window
+default, [idempotency](/docs/concepts/idempotency), [handshake
+answering](/docs/concepts/handshakes), and dispatch — bring your own where the
+provider needs them. If you find yourself reimplementing several of those,
+`createWebhookHandler` with `onEvent` is the same thing with less code:
+
+```ts
+const handler = createWebhookHandler({
+  provider: stripe({ secret }),
+  onEvent: async (event) => queue.push(event),  // every verified event
+})
+```

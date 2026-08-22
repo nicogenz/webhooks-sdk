@@ -1,0 +1,58 @@
+---
+title: Handshakes
+description: Most providers won't deliver anything until you answer a one-time challenge — and the right order differs.
+---
+
+Most providers will not deliver anything until you answer a one-time
+challenge. This is the part most webhook code forgets — and it's why a
+freshly deployed endpoint that "never receives events" is usually an endpoint
+that never answered its setup probe.
+
+The SDK answers handshakes for you. A handshake short-circuits before
+dispatch and reports `outcome: 'handshake'`, so your event handlers never
+see it.
+
+## Two classes, and the order matters
+
+**Unsigned challenges** — Meta's `hub.challenge`, Asana's `X-Hook-Secret` —
+must be answered *before* verification, because the request is often what
+establishes the secret. There is nothing to verify against yet.
+
+**Signed challenges** must be verified *first*. Answering them before
+verifying is a security hole — and sometimes a setup failure: Discord probes
+a new endpoint with a deliberately invalid signature and refuses to save the
+URL unless it receives a `401`.
+
+Providers declare which class they are, and the handler orders the two
+calls to match. You don't configure this; it's part of each provider's
+definition.
+
+## What the shipped providers expect
+
+| Provider | Trigger | Expected answer | Signed? |
+|----------|---------|-----------------|---------|
+| Discord (interactions) | POST with `type: 1` (PING) | `{ "type": 1 }` | ✅ must reject a bad signature with 401 |
+| Discord (webhook events) | POST with `type: 0` (PING) | bare `204` | ✅ same |
+| Google Pub/Sub | none — but the endpoint must return 2xx fast | ack within the deadline or it redelivers | n/a |
+| Stripe, GitHub, Twilio, Standard Webhooks | none | — | — |
+
+:::note[Discord ships two products that disagree]
+Discord's interactions endpoint and Webhook Events API both use the same
+Ed25519 verification and both open with a PING — but PING is `type: 1` on
+one and `type: 0` on the other, and they want different answers. Nothing in
+the payload distinguishes them, so the [Discord provider](/docs/providers/discord)
+takes a `mode` option rather than guessing.
+:::
+
+## Observing handshakes
+
+If you process requests manually, the result tells you when a handshake was
+answered:
+
+```ts
+const result = await handler.process(request)
+
+if (result.outcome === 'handshake') {
+  // setup probe answered; no event was dispatched
+}
+```

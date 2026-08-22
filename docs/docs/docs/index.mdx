@@ -1,0 +1,65 @@
+---
+title: Introduction
+description: One way to verify, parse, and route webhooks from every provider.
+sidebar:
+  order: 1
+---
+
+Every provider invented its own signature scheme, its own replay window, and
+its own setup handshake. The differences are real but almost never interesting,
+and getting them subtly wrong fails quietly — a verification bug looks exactly
+like "the webhook didn't fire".
+
+This SDK does the uninteresting parts once, correctly:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { stripe } from 'webhooks-sdk/stripe'
+
+const handler = createWebhookHandler({
+  provider: stripe({ secret: process.env.STRIPE_WEBHOOK_SECRET! }),
+  on: {
+    'payment_intent.succeeded': async (event) => {
+      await fulfill(event.payload.data.object)
+    },
+  },
+})
+
+// Next.js App Router, Hono, Deno, Bun, Workers — anything with a Request.
+export const POST = handler.fetch
+```
+
+That call verifies the signature, enforces the replay window, parses the body,
+and dispatches — returning `401` on a bad signature, `400` on a malformed one,
+`500` if your handler throws (so the provider retries), and `200` otherwise.
+
+## Why this SDK
+
+- **Zero dependencies.** Web Crypto and `fetch` only, so the same code runs on
+  Node 22+, Cloudflare Workers, Deno, and Bun.
+- **Verification done right.** Constant-time comparison, replay windows,
+  secret rotation, and both classes of setup handshake — ordered correctly
+  relative to verification.
+- **Provider-native payloads.** The envelope is normalized; `payload` is the
+  provider's own body, untouched. A Stripe `PaymentIntent` and a GitHub push
+  have nothing in common, and flattening them would lose information.
+- **Testable without mocks.** Every provider ships a signing helper, so your
+  tests exercise the real verification path instead of stubbing it out.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" icon="rocket">
+    Install the SDK and handle your first webhook in a few minutes.
+  </Card>
+  <Card title="Why the raw body matters" href="/docs/concepts/raw-body" icon="file-warning">
+    The single most common cause of "verification randomly fails".
+  </Card>
+  <Card title="Providers" href="/docs/providers" icon="plug">
+    Stripe, GitHub, Discord, Twilio, Google Pub/Sub, and every
+    Standard Webhooks vendor.
+  </Card>
+  <Card title="Framework adapters" href="/docs/guides/frameworks" icon="layers">
+    Next.js, Hono, Express, bare Node — or anything that speaks `Request`.
+  </Card>
+</CardGroup>

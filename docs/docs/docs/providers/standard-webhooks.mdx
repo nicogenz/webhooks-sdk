@@ -1,0 +1,114 @@
+---
+title: Standard Webhooks
+description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate ship as wrappers; everything else works generically.
+---
+
+The [Standard
+Webhooks](https://www.standardwebhooks.com) spec — used by every Svix-backed
+vendor — signs `{id}.{timestamp}.{body}` with HMAC-SHA256, base64, in a
+space-delimited list of versioned candidates ([scheme family
+3](/docs/providers#scheme-families)). It's specified tightly enough that every
+vendor on it is the same code.
+
+Both header generations are accepted (`webhook-id`/`webhook-timestamp`/
+`webhook-signature` and the older `svix-*`), along with the spec's
+asymmetric Ed25519 `v1a` signatures.
+
+## Named wrappers
+
+Four vendors ship as typed one-line wrappers:
+
+<Tabs>
+  <Tab title="Resend">
+    ```ts
+    import { resend } from 'webhooks-sdk/resend'
+
+    resend({ secret: process.env.RESEND_WEBHOOK_SECRET! })
+    // event types: email.sent, email.delivered, email.bounced, …
+    ```
+  </Tab>
+  <Tab title="Clerk">
+    ```ts
+    import { clerk } from 'webhooks-sdk/clerk'
+
+    clerk({ secret: process.env.CLERK_WEBHOOK_SECRET! })
+    // event types: user.created, session.created, organization.updated, …
+    ```
+  </Tab>
+  <Tab title="Polar">
+    ```ts
+    import { polar } from 'webhooks-sdk/polar'
+
+    polar({ secret: process.env.POLAR_WEBHOOK_SECRET! })
+    // event types: order.paid, subscription.active, checkout.created, …
+    ```
+  </Tab>
+  <Tab title="Replicate">
+    ```ts
+    import { replicate } from 'webhooks-sdk/replicate'
+
+    replicate({ secret: process.env.REPLICATE_WEBHOOK_SECRET! })
+    // event types are prediction statuses: starting, processing, succeeded, failed, canceled
+    ```
+  </Tab>
+</Tabs>
+
+Each takes `{ secret, tolerance? }` and adds typed event names — nothing
+else differs from the generic provider.
+
+## Any other vendor, right now
+
+A vendor without a wrapper doesn't need one:
+
+```ts
+import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
+
+standardWebhooks({ id: 'openai', secret: process.env.OPENAI_WEBHOOK_SECRET! })
+```
+
+That covers OpenAI, Dodo Payments, Stytch, Loops, and Svix itself — and any
+vendor whose docs mention `whsec_` secrets or `svix-*`/`webhook-*` headers.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). |
+| `publicKey` | `string \| string[]` | — | The `whpk_…` Ed25519 key(s), for vendors signing with `v1a`. Either credential alone suffices. |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+| `id` | `string` | `'standard-webhooks'` | Provider slug used in the envelope and error messages. |
+| `name` | `string` | `'Standard Webhooks'` | Display name. |
+| `eventType` | `string \| ((payload) => string \| undefined)` | `'type'` | Which body field names the event. |
+
+## Two details the spec makes easy to get wrong
+
+**The secret is base64 *after* the `whsec_` prefix.** Signing with the
+literal string produces a digest that never matches. The SDK decodes it for
+you — and throws a loud `ConfigurationError` on an undecodable secret
+instead of failing every delivery as a bad signature.
+
+**The signature header is a list.** During key rotation, vendors send
+several space-delimited candidates (`v1,abc v1,def`). The SDK checks all of
+them; unknown versions are ignored rather than rejected, so a future `v2`
+fails closed instead of breaking you.
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical dedup key.
+- `event.type` — the body's `type` field by default; override with
+  `eventType` (Replicate's wrapper, for instance, uses the `status` field).
+- `event.timestamp` — the signed `webhook-timestamp`.
+
+## Standalone & testing
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, options) — throws on failure
+  parseStandardWebhook,   // (raw, options?) — the envelope
+  signStandardWebhook,    // (body, secret, { id?, timestamp?, headerPrefix? }) — all three headers
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+`signStandardWebhook` returns the three headers as a record — pass
+`headerPrefix: 'svix'` to produce the legacy names. See
+[Testing](/docs/guides/testing).

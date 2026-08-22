@@ -1,0 +1,80 @@
+---
+title: Stripe
+description: HMAC over timestamp + body via Stripe-Signature — replay-safe, with first-class secret rotation.
+---
+
+Stripe signs each delivery with HMAC-SHA256 over `{timestamp}.{body}`,
+hex-encoded in the `Stripe-Signature` header ([scheme family
+2](/docs/providers#scheme-families)). The timestamp is inside the signed material,
+so Stripe is replay-safe on its own.
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { stripe } from 'webhooks-sdk/stripe'
+
+const handler = createWebhookHandler({
+  provider: stripe({ secret: process.env.STRIPE_WEBHOOK_SECRET! }),
+  on: {
+    'payment_intent.succeeded': async (event) => {
+      await fulfill(event.payload.data.object)
+    },
+    'customer.subscription.deleted': async (event) => {
+      await revoke(event.payload.data.object)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the `whsec_…` value shown when you create the endpoint in the
+Stripe dashboard (or via the API). Each endpoint has its own — Connect and
+Issuing endpoints too, so configure one provider per endpoint secret.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | Endpoint signing secret(s). Pass an array during [rotation](#rotating-secrets). |
+| `tolerance` | `number` | `300` | Replay window in seconds. `0` disables it. |
+
+## Rotating secrets
+
+Stripe keeps the previous secret valid for 24 hours after you roll it.
+Deploy with both during that window:
+
+```ts
+stripe({ secret: [process.env.STRIPE_SECRET_NEW!, process.env.STRIPE_SECRET_OLD!] })
+```
+
+The header can also carry multiple `v1=` signatures; all candidates are
+checked against all secrets. See [Secret rotation](/docs/guides/secret-rotation).
+
+## The envelope
+
+- `event.id` — Stripe's event id (`evt_…`), the natural
+  [idempotency](/docs/concepts/idempotency) key.
+- `event.type` — the body's `type` (`payment_intent.succeeded`, …). Common
+  event names autocomplete; any string routes.
+- `event.timestamp` — from the body's `created`.
+- `event.payload` — the full Stripe event object; your data is at
+  `payload.data.object`.
+
+## Standalone & testing
+
+```ts
+import {
+  verifyStripeWebhook,   // (raw, { secret, tolerance? }) — throws on failure
+  parseStripeWebhook,    // (raw) — the envelope
+  signStripeWebhook,     // (body, secret, timestamp?) — a valid header value, for tests
+} from 'webhooks-sdk/stripe'
+```
+
+See [Standalone verification](/docs/guides/standalone-verification) and
+[Testing](/docs/guides/testing).
+
+:::warning[Don't parse before you verify]
+Stripe's signature covers the exact bytes on the wire. If you're on
+Express, mount the route with `express.raw()` before any JSON parser — see
+[Why the raw body matters](/docs/concepts/raw-body).
+:::

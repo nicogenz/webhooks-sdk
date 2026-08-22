@@ -1,0 +1,84 @@
+---
+title: Discord
+description: Ed25519 signatures over timestamp + body — with a mode switch for Discord's two disagreeing products.
+---
+
+Discord signs each request with an Ed25519 public-key signature over
+`{timestamp}{body}`, via `X-Signature-Ed25519` and `X-Signature-Timestamp`
+([scheme family 4](/docs/providers#scheme-families)). No shared secret to leak —
+you configure the **public key** from the developer portal.
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { discord } from 'webhooks-sdk/discord'
+
+const handler = createWebhookHandler({
+  provider: discord({ publicKey: process.env.DISCORD_PUBLIC_KEY! }),
+  on: {
+    application_command: async (event) => await runCommand(event.payload),
+  },
+})
+
+export const POST = handler.fetch
+```
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `publicKey` | `string \| string[]` | — | The app's public key (hex, 64 chars) from the developer portal. |
+| `mode` | `'interactions' \| 'events'` | `'interactions'` | Which Discord product this endpoint serves — see below. |
+| `tolerance` | `number` | `300` | Replay window in seconds. `0` disables it. |
+
+## Two products that disagree
+
+Discord ships an **interactions** endpoint and a **Webhook Events API**.
+Both use the same Ed25519 verification, and both open with a PING — but
+PING is `type: 1` on one and `type: 0` on the other, and they expect
+different answers (`{"type":1}` versus a bare `204`). Since `type: 1` means
+"an event" in the second product, nothing in the payload distinguishes
+them — so the provider takes a `mode` instead of guessing:
+
+<Tabs>
+  <Tab title="Interactions (default)">
+    ```ts
+    discord({ publicKey })
+    ```
+
+    Event types are the interaction kinds: `ping`, `application_command`,
+    `message_component`, `application_command_autocomplete`, `modal_submit`.
+  </Tab>
+  <Tab title="Webhook Events API">
+    ```ts
+    discord({ publicKey, mode: 'events' })
+    ```
+
+    Event types come from the payload's `event.type` field.
+  </Tab>
+</Tabs>
+
+## The handshake is signed — and strict
+
+When you save an endpoint URL, Discord probes it with a deliberately
+**invalid** signature and refuses to save the URL unless it receives a
+`401`. It then sends a signed PING that must be answered correctly.
+
+The provider declares `signedHandshake: true`, so verification runs before
+the handshake and both probes are answered properly. If endpoint
+registration keeps failing, something in front of the SDK (a catch-all
+error page, a proxy returning 200s) is answering the invalid probe instead
+of letting the 401 through. See [Handshakes](/docs/concepts/handshakes).
+
+## Standalone & testing
+
+```ts
+import {
+  verifyDiscordWebhook,  // (raw, { publicKey, mode?, tolerance? }) — throws on failure
+  parseDiscordWebhook,   // (raw, options) — the envelope
+  signDiscordWebhook,    // (body, privateKey, timestamp?) — both headers, for tests
+} from 'webhooks-sdk/discord'
+```
+
+`signDiscordWebhook` takes a private `CryptoKey` — generate a throwaway
+Ed25519 pair in the test and give the provider the public half. See
+[Testing](/docs/guides/testing#the-signing-helpers).

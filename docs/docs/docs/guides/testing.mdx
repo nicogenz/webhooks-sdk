@@ -1,0 +1,130 @@
+---
+title: Testing
+description: Sign fixtures with the real algorithm instead of stubbing the verifier — a test that mocks verification tests nothing.
+---
+
+Every provider ships a signing helper, so your tests exercise the real
+verification path. A test that stubs the verifier tests nothing: it passes
+whether or not your route can verify an actual delivery.
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { createWebhookRequest, eventRecorder } from 'webhooks-sdk/testing'
+import { stripe, signStripeWebhook } from 'webhooks-sdk/stripe'
+
+const SECRET = 'whsec_test'
+const NOW = new Date('2026-08-20T12:00:00Z')
+
+const body = JSON.stringify({
+  id: 'evt_1',
+  object: 'event',
+  type: 'payment_intent.succeeded',
+  created: Math.floor(NOW.getTime() / 1000),
+  data: { object: {} },
+})
+
+const request = createWebhookRequest({
+  body,
+  headers: {
+    'stripe-signature': await signStripeWebhook(body, SECRET, Math.floor(NOW.getTime() / 1000)),
+  },
+})
+
+const recorder = eventRecorder()
+const handler = createWebhookHandler({
+  provider: stripe({ secret: SECRET }),
+  now: () => NOW,
+  onEvent: recorder.record,
+})
+
+const result = await handler.process(request)
+
+expect(result.outcome).toBe('handled')
+expect(recorder.types).toEqual(['payment_intent.succeeded'])
+```
+
+## The utilities
+
+### `createWebhookRequest`
+
+Builds a `Request` whose body bytes are exactly what you passed:
+
+```ts
+createWebhookRequest({
+  body,                 // string or object
+  headers: { /* … */ },
+  url: 'https://example.test/api/webhooks',  // the default
+  method: 'POST',                            // the default
+})
+```
+
+An object `body` is serialized once, and that same string is what you sign
+and what gets sent — the property signature tests depend on. `GET` and
+`HEAD` requests are built bodiless, matching the challenge probes several
+providers send.
+
+### `eventRecorder`
+
+A tiny sink for dispatched events:
+
+```ts
+const recorder = eventRecorder()
+// pass recorder.record as onEvent, then assert:
+recorder.events  // WebhookEvent[]
+recorder.types   // string[] of event.type, in order
+recorder.clear()
+```
+
+`memoryIdempotencyStore` is re-exported from `webhooks-sdk/testing` too, so
+test files need only the one import path.
+
+## Controlling the clock
+
+Replay windows compare the signed timestamp against *now*. Inject `now` to
+test them without waiting:
+
+```ts
+const handler = createWebhookHandler({
+  provider: stripe({ secret: SECRET }),
+  now: () => new Date('2026-08-20T12:10:00Z'),  // 10 minutes after signing
+})
+
+const result = await handler.process(request)
+expect(result.error?.code).toBe('timestamp_out_of_tolerance')
+```
+
+Setting `tolerance: 0` disables the window entirely — useful when replaying
+captured production deliveries whose timestamps are long past.
+
+## The signing helpers
+
+| Provider | Helper | Returns |
+|----------|--------|---------|
+| Stripe | `signStripeWebhook(body, secret, timestamp?)` | the `Stripe-Signature` header value |
+| GitHub | `signGitHubWebhook(body, secret)` | the `X-Hub-Signature-256` header value |
+| Standard Webhooks | `signStandardWebhook(body, secret, { id?, timestamp?, headerPrefix? })` | all three headers as a record |
+| Discord | `signDiscordWebhook(body, privateKey, timestamp?)` | both signature headers as a record |
+| Google Pub/Sub | `signGooglePubSubWebhook(privateKey, options)` | the `Authorization` header as a record |
+| Twilio | `signTwilioWebhook(url, params, authToken)` | the `X-Twilio-Signature` header value |
+
+The asymmetric ones (Discord, Pub/Sub) take a private `CryptoKey`. Generate
+a throwaway pair in the test and hand the public half to the provider:
+
+```ts
+const { publicKey, privateKey } = await crypto.subtle.generateKey(
+  { name: 'Ed25519' }, true, ['sign', 'verify'],
+) as CryptoKeyPair
+```
+
+## Testing failure paths
+
+Verification code earns its keep on the failures. Worth covering in any
+integration:
+
+- the **wrong secret** — expect `invalid_signature`
+- a **body tampered with after signing** — expect `invalid_signature`
+- a **missing header** — expect `missing_signature`
+- a **stale timestamp**, where the scheme signs one — expect
+  `timestamp_out_of_tolerance`
+- the **same event twice** with an idempotency store — expect
+  `outcome: 'duplicate'` on the second pass

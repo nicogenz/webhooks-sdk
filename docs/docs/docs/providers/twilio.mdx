@@ -1,0 +1,94 @@
+---
+title: Twilio
+description: Twilio signs your public endpoint URL plus the sorted params — not the body — so the URL has to be right.
+---
+
+Twilio signs each request with HMAC-SHA1, base64, over your
+endpoint's **full public URL** plus the sorted request parameters, in
+`X-Twilio-Signature` ([scheme family 7](/docs/providers#scheme-families) — the
+canonical-string family). Nothing time-varying is signed, so pair it with an
+[idempotency store](/docs/concepts/idempotency).
+
+```ts
+import { createWebhookHandler, memoryIdempotencyStore } from 'webhooks-sdk'
+import { twilio } from 'webhooks-sdk/twilio'
+
+const handler = createWebhookHandler({
+  provider: twilio({
+    authToken: process.env.TWILIO_AUTH_TOKEN!,
+    url: 'https://example.com/webhooks/twilio',
+  }),
+  idempotency: memoryIdempotencyStore(),
+  on: {
+    'message.received': async (event) => await reply(event.payload),
+    'call.completed': async (event) => await logCall(event.payload),
+  },
+})
+
+export const POST = handler.fetch
+```
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `authToken` | `string \| string[]` | — | Your account's auth token. Pass `[primary, secondary]` while rotating. |
+| `url` | `string \| ((raw) => string)` | the request URL | The exact URL Twilio signs — see below. |
+
+## The URL is part of the signature
+
+Twilio signs the URL **as configured in the Twilio console**, including
+scheme, host, and query string. The default — using the incoming request's
+own URL — is only correct when nothing rewrites it. Behind a load balancer,
+a tunnel, or a framework rewrite, set `url` explicitly:
+
+```ts
+// Static:
+twilio({ authToken, url: 'https://example.com/webhooks/twilio' })
+
+// Multi-tenant — derive it per request:
+twilio({ authToken, url: (raw) => tenantUrl(raw.header('host')) })
+```
+
+A string `url` without a query string adopts the request's own query
+parameters, since Twilio appends signed params (like `bodySHA256`) to your
+configured URL.
+
+:::warning[Node and Express need the explicit URL]
+Node's `req.url` is just a path, so behind `toNodeHandler` or
+`toExpressHandler` the `url` option is required — the provider throws a
+`ConfigurationError` at the first delivery rather than silently failing
+every request as a bad signature.
+:::
+
+## Form and JSON deliveries
+
+Classic Twilio webhooks are form-encoded: the signature covers the URL plus
+the sorted form fields, and `event.payload` is the field record. For
+JSON-bodied products, Twilio instead appends a `bodySHA256` parameter to
+the URL and signs that — the SDK verifies the body against it as part of
+the same signature check.
+
+## The envelope
+
+- `event.type` — `EventType` verbatim where a product sends one
+  (Conversations, TaskRouter, Sync); otherwise derived as
+  `message.<status>` / `call.<status>` from `MessageStatus`, `SmsStatus`,
+  or `CallStatus`.
+- `event.id` — built from the `MessageSid`/`CallSid` plus the event type,
+  so status callbacks for the same message deduplicate per status, not per
+  message.
+- `event.timestamp` — receipt time; nothing on the wire.
+
+## Standalone & testing
+
+```ts
+import {
+  verifyTwilioWebhook,  // (raw, { authToken, url? }) — throws on failure
+  parseTwilioWebhook,   // (raw) — the envelope
+  signTwilioWebhook,    // (url, params, authToken) — a valid header value, for tests
+} from 'webhooks-sdk/twilio'
+```
+
+See [Standalone verification](/docs/guides/standalone-verification) and
+[Testing](/docs/guides/testing).
