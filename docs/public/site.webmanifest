@@ -1,0 +1,23 @@
+{
+  "name": "Webhooks SDK",
+  "short_name": "Webhooks SDK",
+  "description": "One way to verify, parse, and route webhooks from every provider.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#2389e2",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
