@@ -20,4 +20,5 @@ export default defineConfig({
   logo: "/logo.svg",
   // Blume emits no manifest link or theme-color metas of its own.
   integrations: [manifestLinks()],
+  lastModified: true
 });
