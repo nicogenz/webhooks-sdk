@@ -14,11 +14,11 @@ export default defineConfig({
   deployment: {
     site: "https://webhooks-sdk.com",
   },
-  // Inlined by Blume as SVG, so the mark stays crisp at any size and scales with
-  // the header text. The wordmark beside it falls back to `title`. The favicon
-  // and apple-touch icon in public/ are picked up by filename, no config needed.
   logo: "/logo.svg",
-  // Blume emits no manifest link or theme-color metas of its own.
   integrations: [manifestLinks()],
-  lastModified: true
+  lastModified: true,
+  github: {
+    owner: 'nicogenz',
+    repo: 'webhooks-sdk'
+  }
 });
