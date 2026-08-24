@@ -1,6 +1,6 @@
 ---
 title: Framework adapters
-description: Mount the same handler on Next.js, Hono, Express, bare Node — or anything that speaks Request.
+description: Mount the same handler on Next.js, Nuxt, Hono, Express, bare Node — or anything that speaks Request.
 ---
 
 The handler's native interface is Web-standard: `handler.fetch` is a
@@ -39,6 +39,49 @@ import { toNodeHandler } from 'webhooks-sdk/node'
 export const config = { api: { bodyParser: false } }
 export default toNodeHandler(handler)
 ```
+
+## Nuxt & Nitro — `webhooks-sdk/nuxt`
+
+Nuxt server routes run on [h3](https://h3.dev), so the adapter is an h3 event
+handler:
+
+```ts server/api/webhooks/stripe.ts
+import { toNuxtHandler } from 'webhooks-sdk/nuxt'
+
+export default defineEventHandler(toNuxtHandler(handler))
+```
+
+Name the route file without a method suffix (`stripe.ts`, not
+`stripe.post.ts`) if your provider confirms a new endpoint with a GET
+challenge — a suffixed file would never see the challenge request.
+
+Both h3 lines are supported from the one import: on h3 v2 (Nitro v3) the
+event already carries a web `Request`; on v1 (current Nuxt releases) the
+adapter reads the untouched bytes off the underlying Node stream. Nothing has
+consumed the body before your route runs, so there is no raw-body trap like
+Express has.
+
+Nuxt is one of several frameworks whose server routes are really
+[Nitro](https://nitro.build) routes — Analog, SolidStart, and TanStack Start
+are Nitro underneath too. The same adapter ships as `toNitroHandler` from
+`webhooks-sdk/nitro` for all of them:
+
+```ts server/routes/webhooks/stripe.ts
+import { toNitroHandler } from 'webhooks-sdk/nitro'
+
+export default defineEventHandler(toNitroHandler(handler))
+```
+
+And as `toH3Handler` from `webhooks-sdk/h3` for plain h3 apps:
+
+```ts
+import { toH3Handler } from 'webhooks-sdk/h3'
+
+app.use('/webhooks/stripe', defineEventHandler(toH3Handler(handler)))
+```
+
+All three names are the one function — pick the import that matches what you
+call your framework.
 
 ## Hono — `webhooks-sdk/hono`
 

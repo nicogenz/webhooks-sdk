@@ -41,7 +41,7 @@ export type {
   WebhookHandlerOptions,
   WebhookResult,
 } from './core/handler.js'
-export { createWebhookHandler, DEFAULT_TOLERANCE_SECONDS } from './core/handler.js'
+export { createWebhookHandler, DEFAULT_TOLERANCE_SECONDS, toResponse } from './core/handler.js'
 export type { IdempotencyStore, MemoryIdempotencyOptions } from './core/idempotency.js'
 export { memoryIdempotencyStore } from './core/idempotency.js'
 export type { Jwk, KeySet, RemoteKeySetOptions } from './core/keyset.js'
