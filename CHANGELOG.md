@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.2...v0.1.3) (2026-08-31)
+
+
+### Features
+
+* add openai provider ([#6](https://github.com/nicogenz/webhooks-sdk/issues/6)) ([21d8ba3](https://github.com/nicogenz/webhooks-sdk/commit/21d8ba354c9bf2b6d28adceac6e688b671aeaa09))
+
 ## [0.1.2](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.1...v0.1.2) (2026-08-31)
 
 
