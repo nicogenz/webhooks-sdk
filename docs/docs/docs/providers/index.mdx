@@ -7,9 +7,9 @@ sidebar:
 
 Shipping today: **Stripe**, **GitHub**, **Discord**, **Twilio**,
 **Google Pub/Sub** (which also carries Gmail push, Play RTDN, and Workspace
-Events), and **Standard Webhooks** — the last of which covers every
-Svix-backed vendor, with named wrappers for **Resend**, **Clerk**, **Polar**,
-and **Replicate**.
+Events), **OpenAI**, and **Standard Webhooks** — the last of which covers
+every Svix-backed vendor, with named wrappers for **Resend**, **Clerk**,
+**Polar**, and **Replicate**.
 
 <CardGroup cols={2}>
   <Card title="Stripe" href="/docs/providers/stripe" icon="stripe">
@@ -27,8 +27,11 @@ and **Replicate**.
   <Card title="Google Pub/Sub" href="/docs/providers/google-pubsub" icon="google-pubsub">
     Also carries Gmail push, Play RTDN, and Workspace Events.
   </Card>
+  <Card title="OpenAI" href="/docs/providers/openai" icon="openai">
+    Response, batch, fine-tuning, eval, and call events.
+  </Card>
   <Card title="Standard Webhooks" href="/docs/providers/standard-webhooks" icon="webhook">
-    Resend, Clerk, Polar, Replicate, OpenAI, Svix — one spec.
+    Resend, Clerk, Polar, Replicate, Svix — one spec.
   </Card>
 </CardGroup>
 
@@ -37,10 +40,10 @@ Any Standard Webhooks vendor without a named wrapper works right now:
 ```ts
 import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
 
-standardWebhooks({ id: 'openai', secret: process.env.OPENAI_WEBHOOK_SECRET! })
+standardWebhooks({ id: 'loops', secret: process.env.LOOPS_WEBHOOK_SECRET! })
 ```
 
-That covers OpenAI, Dodo Payments, Stytch, Loops, and Svix itself.
+That covers Loops, Dodo Payments, Stytch, and Svix itself.
 
 ## Scheme families
 

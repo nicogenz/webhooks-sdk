@@ -1,0 +1,98 @@
+---
+title: OpenAI
+description: Verify and handle OpenAI webhooks — response, batch, fine-tuning, eval, and call events.
+---
+
+Create the endpoint under your project's [webhook
+settings](https://platform.openai.com/settings/project/webhooks), pass its
+signing secret, and handle events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { openai } from 'webhooks-sdk/openai'
+
+const handler = createWebhookHandler({
+  provider: openai({ secret: process.env.OPENAI_WEBHOOK_SECRET! }),
+  on: {
+    'response.completed': async (event) => {
+      await deliver(event.payload.data.id)
+    },
+    'fine_tuning.job.succeeded': async (event) => {
+      await promote(event.payload.data.id)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the `whsec_…` value shown when you create the endpoint. OpenAI
+signs with [Standard Webhooks](/docs/providers/standard-webhooks) over the
+spec's `webhook-*` headers — the id and timestamp are inside the signed
+material, so a replayed request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`response.completed` · `response.cancelled` · `response.failed` ·
+`response.incomplete` · `batch.completed` · `batch.cancelled` ·
+`batch.expired` · `batch.failed` · `fine_tuning.job.succeeded` ·
+`fine_tuning.job.failed` · `fine_tuning.job.cancelled` ·
+`eval.run.succeeded` · `eval.run.failed` · `eval.run.canceled` ·
+`realtime.call.incoming` · `live.call.incoming` · `safety.alert.created`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type OpenAI adds later is handled without an SDK update.
+
+Mind the spelling: `eval.run.canceled` has one `l` while `response.cancelled`
+and its siblings have two. That's OpenAI's own inconsistency, kept verbatim
+because the strings must match the wire.
+
+## The payload is a pointer, not the resource
+
+OpenAI webhook bodies are thin — `{ id, type, created_at, data }`, where
+`data.id` names the response, batch, job, run, or call. Fetch the full object
+through the API client rather than expecting it in the delivery:
+
+```ts
+'response.completed': async (event) => {
+  const response = await client.responses.retrieve(event.payload.data.id!)
+},
+```
+
+An incoming SIP call can emit both `realtime.call.incoming` and
+`live.call.incoming` for the same pending session — whichever accept endpoint
+answers first selects the runtime surface, so handle the one you use and
+ignore the other.
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical
+  [idempotency](/docs/concepts/idempotency) key.
+- `event.type` — the body's `type`.
+- `event.timestamp` — the signed `webhook-timestamp`.
+- `event.payload` — the thin event object; the resource id is at
+  `payload.data.id`.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'openai'`, so the
+standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw) — the envelope
+  signStandardWebhook,    // (body, secret) — all three webhook-* headers, for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+`signStandardWebhook`'s default `webhook-*` header names are exactly what
+OpenAI sends. See [Testing](/docs/guides/testing).

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { toBase64, utf8 } from '../src/crypto/index.js'
 import { createWebhookHandler } from '../src/index.js'
 import { clerk } from '../src/providers/clerk/index.js'
+import { openai } from '../src/providers/openai/index.js'
 import { polar } from '../src/providers/polar/index.js'
 import { replicate } from '../src/providers/replicate/index.js'
 import { resend } from '../src/providers/resend/index.js'
@@ -256,6 +257,29 @@ describe('vendor wrappers', () => {
     const result = await handler.process(await signed({ headerPrefix: 'svix' }))
     expect(result.event?.provider).toBe('resend')
     expect(handled).toHaveBeenCalledOnce()
+  })
+
+  it('openai verifies over the spec webhook-* headers and dispatches', async () => {
+    const body = JSON.stringify({
+      id: 'evt_1',
+      object: 'event',
+      type: 'response.completed',
+      created_at: TS,
+      data: { id: 'resp_1' },
+    })
+    const handled = vi.fn()
+    const handler = createWebhookHandler({
+      provider: openai({ secret: SECRET }),
+      now: () => NOW,
+      on: {
+        'response.completed': async (event) => handled(event.payload.data.id),
+      },
+    })
+
+    const result = await handler.process(await signed({ body }))
+    expect(result.event?.provider).toBe('openai')
+    expect(result.event?.type).toBe('response.completed')
+    expect(handled).toHaveBeenCalledWith('resp_1')
   })
 
   it('clerk and polar reuse the same scheme with their own slug', async () => {

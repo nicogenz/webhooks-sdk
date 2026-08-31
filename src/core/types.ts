@@ -64,9 +64,13 @@ export type PayloadOf<TEvents extends EventMap, TType> = TType extends keyof TEv
   ? TEvents[TType]
   : unknown
 
-export type EventHandler<TEvent extends WebhookEvent = WebhookEvent> = (
-  event: TEvent,
-) => void | Promise<void>
+// Method syntax keeps the parameter bivariant, so a handler typed for one
+// event name stays assignable to the `string & {}` catch-all entry in
+// `EventHandlers`. Safe here: dispatch only ever calls the handler registered
+// under the event's own name.
+export type EventHandler<TEvent extends WebhookEvent = WebhookEvent> = {
+  handler(event: TEvent): void | Promise<void>
+}['handler']
 
 export type EventHandlers<TEvents extends EventMap> = {
   [K in EventName<TEvents>]?: EventHandler<WebhookEvent<K & string, PayloadOf<TEvents, K>>>

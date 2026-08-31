@@ -10,6 +10,7 @@ export default defineMeta({
     "discord",
     "twilio",
     "google-pubsub",
+    "openai",
     "standard-webhooks",
     "custom",
   ],
