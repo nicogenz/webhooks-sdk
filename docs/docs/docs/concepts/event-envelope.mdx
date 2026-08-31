@@ -33,9 +33,6 @@ flattening them into a shared shape would lose information without buying
 much. You already know which provider you're integrating; what you want is
 that provider's documented payload, not a lossy abstraction over it.
 
-A cross-provider `semantic` view for the domains where it genuinely fits —
-payments, git, messaging — is planned as an opt-in layer, not a replacement.
-
 ## Typed payloads
 
 Providers ship event maps, so handlers narrow by event name:

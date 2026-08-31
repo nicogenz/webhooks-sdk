@@ -1,14 +1,11 @@
 ---
 title: Google Pub/Sub
-description: OIDC JWT verified against Google's JWKS — with the push envelope unwrapped so events arrive as events.
+description: Verify Pub/Sub push deliveries — and Gmail push, Play RTDN, and Workspace Events with them — envelope unwrapped for you.
 ---
 
-Google Cloud Pub/Sub **push**
-authenticates with an OIDC JWT in `Authorization: Bearer`, verified against
-Google's rotating JWKS ([scheme family 5](/docs/providers#scheme-families)) with
-issuer, audience, expiry, and service-account checks. Because Gmail push,
-Google Play RTDN, and Workspace Events all deliver through Pub/Sub, this one
-provider covers them all.
+One provider covers everything Google delivers through Pub/Sub **push** —
+Gmail push, Google Play RTDN, Workspace Events, and your own topics.
+Configure the push subscription's audience and its invoker service account:
 
 ```ts
 import { createWebhookHandler } from 'webhooks-sdk'
@@ -29,6 +26,10 @@ const handler = createWebhookHandler({
 
 export const POST = handler.fetch
 ```
+
+Each delivery carries an OIDC JWT [verified against Google's rotating
+keys](/docs/providers#scheme-families) — issuer, audience, expiry, and
+service account all checked.
 
 ## Options
 

@@ -1,12 +1,10 @@
 ---
 title: Discord
-description: Ed25519 signatures over timestamp + body — with a mode switch for Discord's two disagreeing products.
+description: Verify Discord interactions and Webhook Events — the right PING answer for both products, and the 401 the setup probe demands.
 ---
 
-Discord signs each request with an Ed25519 public-key signature over
-`{timestamp}{body}`, via `X-Signature-Ed25519` and `X-Signature-Timestamp`
-([scheme family 4](/docs/providers#scheme-families)). No shared secret to leak —
-you configure the **public key** from the developer portal.
+Grab your app's **public key** from the developer portal — Discord verifies
+with public-key signatures, so there is no shared secret to leak:
 
 ```ts
 import { createWebhookHandler } from 'webhooks-sdk'
@@ -21,6 +19,10 @@ const handler = createWebhookHandler({
 
 export const POST = handler.fetch
 ```
+
+Signatures are [Ed25519 over the timestamp and
+body](/docs/providers#scheme-families), so stale requests fall outside the
+replay window on their own.
 
 ## Options
 

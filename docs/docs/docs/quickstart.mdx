@@ -61,6 +61,13 @@ handler throws (so the provider retries), and `200` otherwise.
 ## Other frameworks
 
 <Tabs>
+  <Tab title="Nuxt">
+    ```ts server/api/webhooks/stripe.ts
+    import { toNuxtHandler } from 'webhooks-sdk/nuxt'
+
+    export default defineEventHandler(toNuxtHandler(handler))
+    ```
+  </Tab>
   <Tab title="Hono">
     ```ts
     import { toHonoHandler } from 'webhooks-sdk/hono'
@@ -97,6 +104,9 @@ Signature schemes sign the exact bytes on the wire. If `express.json()` runs
 before the webhook route, verification fails. Mount the webhook route before
 any JSON parser — see [Why the raw body matters](/docs/concepts/raw-body).
 :::
+
+Every adapter — including Nuxt, Nitro, and h3 — has its own page under
+[Adapters](/docs/adapters).
 
 ## Next steps
 

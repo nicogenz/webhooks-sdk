@@ -3,16 +3,11 @@ title: Standard Webhooks
 description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate ship as wrappers; everything else works generically.
 ---
 
-The [Standard
-Webhooks](https://www.standardwebhooks.com) spec — used by every Svix-backed
-vendor — signs `{id}.{timestamp}.{body}` with HMAC-SHA256, base64, in a
-space-delimited list of versioned candidates ([scheme family
-3](/docs/providers#scheme-families)). It's specified tightly enough that every
-vendor on it is the same code.
-
-Both header generations are accepted (`webhook-id`/`webhook-timestamp`/
-`webhook-signature` and the older `svix-*`), along with the spec's
-asymmetric Ed25519 `v1a` signatures.
+Resend, Clerk, Polar, Replicate, OpenAI, Loops, Dodo Payments — and every
+other Svix-backed vendor — sign webhooks the same way: the
+[Standard Webhooks](https://www.standardwebhooks.com) spec. One provider covers them all, whichever
+header generation your vendor sends (`webhook-*` or the older `svix-*`) and
+whichever signature flavor it uses (symmetric `v1` or Ed25519 `v1a`).
 
 ## Named wrappers
 

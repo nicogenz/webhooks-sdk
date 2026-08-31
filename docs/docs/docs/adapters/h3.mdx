@@ -1,0 +1,22 @@
+---
+title: h3
+description: An event handler for plain h3 apps — v1 and v2 from one import.
+---
+
+For plain [h3](https://h3.dev) apps:
+
+```ts
+import { toH3Handler } from 'webhooks-sdk/h3'
+
+app.use('/webhooks/stripe', defineEventHandler(toH3Handler(handler)))
+```
+
+Both h3 lines are supported from the one import: on h3 v2 (Nitro v3) the
+event already carries a web `Request`; on v1 (current Nuxt releases) the
+adapter reads the untouched bytes off the underlying Node stream. Nothing has
+consumed the body before your handler runs, so there is no raw-body trap like
+Express has.
+
+`toH3Handler` is the same function as [`toNuxtHandler`](/docs/adapters/nuxt)
+and [`toNitroHandler`](/docs/adapters/nitro) — pick the import that matches
+what you call your framework.

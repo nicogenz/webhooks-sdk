@@ -1,13 +1,13 @@
 ---
 title: Twilio
-description: Twilio signs your public endpoint URL plus the sorted params — not the body — so the URL has to be right.
+description: Verify and handle Twilio webhooks — with the URL detail handled that breaks most hand-rolled implementations.
 ---
 
-Twilio signs each request with HMAC-SHA1, base64, over your
-endpoint's **full public URL** plus the sorted request parameters, in
-`X-Twilio-Signature` ([scheme family 7](/docs/providers#scheme-families) — the
-canonical-string family). Nothing time-varying is signed, so pair it with an
-[idempotency store](/docs/concepts/idempotency).
+Pass your auth token and the exact public URL Twilio calls — the URL is part
+of Twilio's signature, so it has to be right (see
+[below](#the-url-is-part-of-the-signature)). Add an
+[idempotency store](/docs/concepts/idempotency), since nothing time-varying
+is signed:
 
 ```ts
 import { createWebhookHandler, memoryIdempotencyStore } from 'webhooks-sdk'
@@ -37,8 +37,9 @@ export const POST = handler.fetch
 
 ## The URL is part of the signature
 
-Twilio signs the URL **as configured in the Twilio console**, including
-scheme, host, and query string. The default — using the incoming request's
+Twilio [signs your endpoint's full public URL plus the sorted request
+parameters](/docs/providers#scheme-families) — the URL **as configured in the
+Twilio console**, including scheme, host, and query string. The default — using the incoming request's
 own URL — is only correct when nothing rewrites it. Behind a load balancer,
 a tunnel, or a framework rewrite, set `url` explicitly:
 

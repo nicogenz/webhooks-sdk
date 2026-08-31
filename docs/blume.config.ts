@@ -14,6 +14,7 @@ export default defineConfig({
   deployment: {
     site: "https://webhooks-sdk.com",
   },
+  redirects: [{ from: "/docs/guides/frameworks", to: "/docs/adapters" }],
   logo: "/logo.svg",
   integrations: [manifestLinks()],
   lastModified: true,
