@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { captureRawBody, toExpressHandler } from '../src/adapters/express.js'
+import { toH3Handler, toNitroHandler, toNuxtHandler } from '../src/adapters/h3.js'
 import { toHonoHandler } from '../src/adapters/hono.js'
 import { toNextRoute } from '../src/adapters/next.js'
 import type { NodeRequestLike, NodeResponseLike } from '../src/adapters/node.js'
@@ -218,6 +219,48 @@ describe('next adapter', () => {
     // No signature on a challenge request, so this provider rejects it — the
     // point is that the GET reaches the handler at all.
     expect(response.status).toBe(400)
+  })
+})
+
+describe('h3 adapter', () => {
+  it('uses the web Request an h3 v2 event carries on `req`', async () => {
+    const signature = await signStripeWebhook(BODY, SECRET, TS)
+    const handled = vi.fn()
+    const req = createWebhookRequest({ body: BODY, headers: { 'stripe-signature': signature } })
+
+    const response = await toH3Handler(handler({ 'charge.succeeded': handled }))({ req })
+    expect(response.status).toBe(200)
+    expect(handled).toHaveBeenCalledOnce()
+  })
+
+  it('reads the raw bytes off the Node stream on an h3 v1 event', async () => {
+    const signature = await signStripeWebhook(BODY, SECRET, TS)
+    const req = nodeRequest([BODY.slice(0, 12), BODY.slice(12)], { 'stripe-signature': signature })
+
+    // On v1 `event.req` is the Node request too — the deprecated alias must
+    // not be mistaken for a web Request.
+    const response = await toH3Handler(handler({ 'charge.succeeded': vi.fn() }))({
+      req,
+      node: { req },
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, outcome: 'handled' })
+  })
+
+  it('maps a verification failure to a Response with its status', async () => {
+    const req = nodeRequest([BODY], { 'stripe-signature': 't=1,v1=deadbeef' })
+    const response = await toH3Handler(handler())({ node: { req } })
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toBe('timestamp_out_of_tolerance')
+  })
+
+  it('rejects an object that is not an h3 event', async () => {
+    await expect(toH3Handler(handler())({})).rejects.toThrow(/h3 event/)
+  })
+
+  it('exports the Nuxt and Nitro names as the same adapter', () => {
+    expect(toNuxtHandler).toBe(toH3Handler)
+    expect(toNitroHandler).toBe(toH3Handler)
   })
 })
 

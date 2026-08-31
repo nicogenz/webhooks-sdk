@@ -1,12 +1,10 @@
 ---
 title: Stripe
-description: HMAC over timestamp + body via Stripe-Signature — replay-safe, with first-class secret rotation.
+description: Verify and handle Stripe webhooks — replay-safe out of the box, with zero-downtime secret rotation.
 ---
 
-Stripe signs each delivery with HMAC-SHA256 over `{timestamp}.{body}`,
-hex-encoded in the `Stripe-Signature` header ([scheme family
-2](/docs/providers#scheme-families)). The timestamp is inside the signed material,
-so Stripe is replay-safe on its own.
+Create the endpoint in the Stripe dashboard, pass its signing secret, and
+handle events by name:
 
 ```ts
 import { createWebhookHandler } from 'webhooks-sdk'
@@ -30,6 +28,10 @@ export const POST = handler.fetch
 The secret is the `whsec_…` value shown when you create the endpoint in the
 Stripe dashboard (or via the API). Each endpoint has its own — Connect and
 Issuing endpoints too, so configure one provider per endpoint secret.
+
+Deliveries are [signed over the timestamp and body
+together](/docs/providers#scheme-families), so a replayed request is rejected
+on its own — you don't need anything extra for replay protection.
 
 ## Options
 

@@ -1,0 +1,38 @@
+---
+title: Nitro
+description: A webhook endpoint for any Nitro-powered framework — Nitro itself, Analog, SolidStart, TanStack Start.
+---
+
+Works for anything with [Nitro](https://nitro.build) server routes. Add a
+route file and wrap your handler:
+
+```ts server/routes/webhooks/stripe.ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { stripe } from 'webhooks-sdk/stripe'
+import { toNitroHandler } from 'webhooks-sdk/nitro'
+
+const handler = createWebhookHandler({
+  provider: stripe({ secret: process.env.STRIPE_WEBHOOK_SECRET! }),
+  on: {
+    'payment_intent.succeeded': async (event) => {
+      await fulfill(event.payload.data.object)
+    },
+  },
+})
+
+export default defineEventHandler(toNitroHandler(handler))
+```
+
+That's the whole integration. There is no body-parser to disable and no
+raw-body workaround: the adapter reads the untouched bytes, verifies the
+signature, and answers the provider — your `on` handlers get the parsed
+[event envelope](/docs/concepts/event-envelope).
+
+:::warning[Skip the method suffix if your provider sends a GET challenge]
+Name the route file `stripe.ts`, not `stripe.post.ts`, if your provider
+confirms a new endpoint with a GET challenge — a suffixed file would never
+see the challenge request.
+:::
+
+Nitro v2 (h3 v1) and Nitro v3 (h3 v2) are both supported from this one
+import — details on the [h3 page](/docs/adapters/h3) if you're curious.

@@ -45,7 +45,7 @@ app.use(express.json())
 ```
 
 If you can't reorder middleware, use `captureRawBody` from
-`webhooks-sdk/express` — see [Framework adapters](/docs/guides/frameworks).
+`webhooks-sdk/express` — see the [Express adapter](/docs/adapters/express).
 
 :::tip[Your handlers still get parsed JSON]
 Skipping the JSON parser on the webhook route costs you nothing: the

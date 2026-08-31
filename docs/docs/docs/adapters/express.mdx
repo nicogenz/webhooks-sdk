@@ -1,0 +1,42 @@
+---
+title: Express
+description: Two ways to get the raw body past express.json() — a raw route or captureRawBody.
+---
+
+Express is where the [raw body](/docs/concepts/raw-body) bites. Two ways to get
+it right:
+
+<Tabs>
+  <Tab title="Raw route (preferred)">
+    Mount the webhook route with a raw body *before* any JSON parser:
+
+    ```ts
+    import express from 'express'
+    import { toExpressHandler } from 'webhooks-sdk/express'
+
+    app.post('/webhooks/stripe', express.raw({ type: '*/*' }), toExpressHandler(handler))
+    app.use(express.json())
+    ```
+  </Tab>
+  <Tab title="captureRawBody">
+    If you can't reorder middleware, capture the bytes before the global
+    parser consumes them:
+
+    ```ts
+    import { captureRawBody, toExpressHandler } from 'webhooks-sdk/express'
+
+    app.use(express.json({ verify: captureRawBody }))
+    app.post('/webhooks/stripe', toExpressHandler(handler))
+    ```
+  </Tab>
+</Tabs>
+
+The adapter picks up the untouched bytes from either path.
+
+:::warning[Twilio needs an absolute URL]
+Twilio signs your endpoint's full public URL, but Node's `req.url` is just a
+path. Behind `toExpressHandler`, configure the
+[Twilio provider](/docs/providers/twilio) with an explicit `url` — the SDK throws
+a `ConfigurationError` at startup rather than failing every delivery as a
+bad signature.
+:::

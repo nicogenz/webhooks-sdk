@@ -1,0 +1,48 @@
+---
+title: Adapters
+description: Mount the same handler on Next.js, Nuxt, Nitro, h3, Hono, Express, bare Node — or anything that speaks Request.
+sidebar:
+  label: Overview
+---
+
+The handler's native interface is Web-standard: `handler.fetch` is a
+`(request: Request) => Promise<Response>` function. If your platform speaks
+`Request` — Next.js App Router, Cloudflare Workers, Deno, Bun, Remix — you
+need no adapter at all:
+
+```ts
+export const POST = handler.fetch
+```
+
+Adapters exist for the platforms that don't, each on its own subpath so
+nothing you skip is bundled.
+
+<CardGroup cols={2}>
+  <Card title="Next.js" href="/docs/adapters/next" icon="next">
+    App Router route exports, and the Pages Router raw-body setup.
+  </Card>
+  <Card title="Nuxt" href="/docs/adapters/nuxt" icon="nuxt">
+    A webhook endpoint in one `server/api` file.
+  </Card>
+  <Card title="Nitro" href="/docs/adapters/nitro" icon="nitro">
+    Analog, SolidStart, TanStack Start — anything with Nitro server routes.
+  </Card>
+  <Card title="h3" href="/docs/adapters/h3" icon="h3">
+    Plain h3 apps — v1 and v2 from one import.
+  </Card>
+  <Card title="Hono" href="/docs/adapters/hono" icon="hono">
+    One handler wherever Hono runs — Workers, Deno, Bun, Node.
+  </Card>
+  <Card title="Express" href="/docs/adapters/express" icon="express">
+    Two ways past the JSON parser to the raw bytes.
+  </Card>
+  <Card title="Bare Node" href="/docs/adapters/node" icon="node">
+    `node:http` servers, plus the low-level building blocks.
+  </Card>
+</CardGroup>
+
+## Response behavior
+
+All adapters produce the same responses `handler.fetch` would: handshake
+responses pass through verbatim, errors return their
+[status and JSON body](/docs/concepts/errors), everything else returns `200`.

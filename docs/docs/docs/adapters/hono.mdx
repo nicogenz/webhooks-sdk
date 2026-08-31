@@ -1,0 +1,14 @@
+---
+title: Hono
+description: One handler wherever Hono runs — Workers, Deno, Bun, Node.
+---
+
+```ts
+import { toHonoHandler } from 'webhooks-sdk/hono'
+
+app.post('/webhooks/stripe', toHonoHandler(handler))
+```
+
+Works wherever Hono does — Workers, Deno, Bun, Node. The SDK doesn't declare
+Hono as a dependency, so there's nothing extra to install and no version to
+keep in sync.

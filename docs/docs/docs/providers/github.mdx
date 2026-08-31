@@ -1,12 +1,11 @@
 ---
 title: GitHub
-description: HMAC over the raw body via X-Hub-Signature-256 — pair it with an idempotency store for replay protection.
+description: Verify and handle GitHub webhooks — repository, organization, and App hooks, with replay protection one option away.
 ---
 
-GitHub signs each delivery with HMAC-SHA256 over the raw body,
-hex-encoded as `sha256=…` in `X-Hub-Signature-256` ([scheme family
-1](/docs/providers#scheme-families)). This covers repository, organization, and
-GitHub App webhooks.
+Set a secret on the hook, pass it to the provider, and handle events by
+name — repository, organization, and GitHub App webhooks all work the same
+way:
 
 ```ts
 import { createWebhookHandler, memoryIdempotencyStore } from 'webhooks-sdk'
@@ -32,8 +31,9 @@ export const POST = handler.fetch
 
 ## No timestamp — bring a store
 
-GitHub signs the body alone: the signature proves *who* sent the request
-but not *when*, so the same bytes replayed later verify perfectly. Add an
+GitHub [signs the body alone](/docs/providers#scheme-families): the signature
+proves *who* sent the request but not *when*, so the same bytes replayed
+later verify perfectly. Add an
 [idempotency store](/docs/concepts/idempotency) — with GitHub it doubles as
 replay protection.
 

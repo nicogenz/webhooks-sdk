@@ -1,0 +1,26 @@
+---
+title: Bare Node
+description: toNodeHandler for node:http servers, plus building blocks for frameworks with their own request type.
+---
+
+For `node:http` servers and anything built on them:
+
+```ts
+import { createServer } from 'node:http'
+import { toNodeHandler } from 'webhooks-sdk/node'
+
+const server = createServer(toNodeHandler(handler))
+```
+
+The module also exports the building blocks — `readRawBody(request)` and
+`fromNodeRequest(request, rawBody?)` — if you're wiring into a framework
+with its own request type. None of it pulls in `@types/node`, so your own
+type setup stays untouched.
+
+:::warning[Twilio needs an absolute URL on Node]
+Twilio signs your endpoint's full public URL, but Node's `req.url` is just a
+path. Behind `toNodeHandler`, configure the
+[Twilio provider](/docs/providers/twilio) with an explicit `url` — the SDK throws
+a `ConfigurationError` at startup rather than failing every delivery as a
+bad signature.
+:::

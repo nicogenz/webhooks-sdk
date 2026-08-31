@@ -1,0 +1,35 @@
+---
+title: Next.js
+description: App Router route exports from toNextRoute, and the Pages Router raw-body setup.
+---
+
+Import from `webhooks-sdk/next`.
+
+## App Router
+
+The App Router speaks web `Request`, so `export const POST = handler.fetch`
+already works. `toNextRoute` packages the method exports for you:
+
+```ts app/api/webhooks/stripe/route.ts
+import { toNextRoute } from 'webhooks-sdk/next'
+
+export const { POST } = toNextRoute(handler)
+```
+
+`toNextRoute` also returns `GET` and `PUT` — export those too for providers
+that confirm a new endpoint with a challenge query parameter:
+
+```ts
+export const { POST, GET } = toNextRoute(handler)
+```
+
+## Pages Router
+
+Disable the body parser and use the [Node adapter](/docs/adapters/node):
+
+```ts pages/api/webhooks/stripe.ts
+import { toNodeHandler } from 'webhooks-sdk/node'
+
+export const config = { api: { bodyParser: false } }
+export default toNodeHandler(handler)
+```

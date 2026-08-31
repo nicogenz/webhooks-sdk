@@ -1,6 +1,6 @@
 ---
 title: Providers
-description: What ships today, what works via Standard Webhooks, and the nine scheme families behind it all.
+description: Find your provider — Stripe, GitHub, Discord, Twilio, Google Pub/Sub, and every Svix-backed vendor.
 sidebar:
   label: Overview
 ---
@@ -13,19 +13,19 @@ and **Replicate**.
 
 <CardGroup cols={2}>
   <Card title="Stripe" href="/docs/providers/stripe" icon="stripe">
-    HMAC over timestamp + body, `Stripe-Signature`.
+    Payment events, replay-safe, zero-downtime secret rotation.
   </Card>
   <Card title="GitHub" href="/docs/providers/github" icon="github">
-    HMAC over the raw body, `X-Hub-Signature-256`.
+    Repository, organization, and GitHub App webhooks.
   </Card>
   <Card title="Discord" href="/docs/providers/discord" icon="discord">
-    Ed25519 signatures; interactions and Webhook Events.
+    Interactions and Webhook Events — both PINGs answered right.
   </Card>
   <Card title="Twilio" href="/docs/providers/twilio" icon="twilio">
-    Signs your public URL + sorted params, not the body.
+    SMS, voice, and status callbacks — URL signing handled.
   </Card>
   <Card title="Google Pub/Sub" href="/docs/providers/google-pubsub" icon="google-pubsub">
-    OIDC JWT + JWKS; unwraps the push envelope for you.
+    Also carries Gmail push, Play RTDN, and Workspace Events.
   </Card>
   <Card title="Standard Webhooks" href="/docs/providers/standard-webhooks" icon="webhook">
     Resend, Clerk, Polar, Replicate, OpenAI, Svix — one spec.
@@ -45,9 +45,10 @@ That covers OpenAI, Dodo Payments, Stytch, Loops, and Svix itself.
 ## Scheme families
 
 Every webhook provider claims a bespoke signature scheme. Most of them are
-not bespoke at all — roughly nine families cover almost everything, and
-implementing a family is the expensive part. Each additional provider inside
-a family is then a header name, an encoding, and a test fixture.
+not bespoke at all — roughly nine patterns cover almost everything. Two
+things in this table are worth knowing about *your* provider: how it
+verifies, and whether it's replay-safe on its own or needs an
+[idempotency store](/docs/concepts/idempotency) alongside.
 
 | # | Family | How it works | Replay-safe on its own | Examples |
 |---|--------|--------------|------------------------|----------|
@@ -61,11 +62,11 @@ a family is then a header name, an encoding, and a test fixture.
 | 8 | **Shared token compare** | A static secret echoed in a header; constant-time compare only | ❌ | GitLab, Telegram, Google Drive |
 | 9 | **None / out-of-band** | No signature — re-fetch the resource by id, or use mTLS/basic auth/IP allowlist | ❌ | Mollie, Postmark, Docker Hub |
 
-Families 1–4 are pure Web Crypto and ship in the zero-dependency core.
-Families 5 and 6 need a fetch of remote key material, so they carry a
-pluggable cache. Family 7 is the awkward one: the signature covers a string
-the SDK has to rebuild, which means the provider must know the public URL of
-your endpoint — proxies and rewrites break it, so it's configurable.
+Families 5 and 6 verify against remote key material, so those providers
+carry a pluggable key cache. Family 7 is the awkward one for you as the
+receiver: the provider signs the public URL of your endpoint, so a proxy or
+rewrite in front of your app breaks verification — which is why the
+[Twilio provider](/docs/providers/twilio) takes an explicit `url`.
 
 :::tip[Your provider isn't listed?]
 If it's Svix-backed, the [generic Standard Webhooks

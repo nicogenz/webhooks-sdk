@@ -130,6 +130,7 @@ const marquee = [
 const adapters = [
   { name: "Web-standard", code: "export const POST = handler.fetch" },
   { name: "Next.js", code: "export const { POST } = toNextRoute(handler)" },
+  { name: "Nuxt", code: "export default defineEventHandler(toNuxtHandler(handler))" },
   { name: "Hono", code: "app.post('/hook', toHonoHandler(handler))" },
   { name: "Express", code: "app.post('/hook', raw, toExpressHandler(handler))" },
   { name: "Node http", code: "createServer(toNodeHandler(handler))" },
@@ -223,7 +224,7 @@ const codeTheme = "github-dark-default";
       </div>
       <p class="mt-7 text-center">
         <a href="/docs/providers" class="text-sm text-accent hover:underline">
-          ~90 providers across 9 signature families →
+          Browse all ~90 providers →
         </a>
       </p>
     </section>
@@ -361,33 +362,34 @@ const codeTheme = "github-dark-default";
         ))}
       </div>
       <p class="mt-6 text-center">
-        <a href="/docs/guides/frameworks" class="text-sm text-accent hover:underline">
-          Framework adapters →
+        <a href="/docs/adapters" class="text-sm text-accent hover:underline">
+          All adapters — Nuxt, Nitro, h3, and more →
         </a>
       </p>
     </section>
 
-    <!-- Nine families band -->
+    <!-- Providers band -->
     <section class="border-t border-border py-16">
       <div class="mx-auto flex max-w-3xl flex-col items-center gap-4 rounded-2xl border border-border bg-muted px-6 py-12 text-center">
-        <p class="text-4xl font-semibold text-foreground">9 families · ~90 providers</p>
+        <p class="text-4xl font-semibold text-foreground">~90 providers. One handler.</p>
         <p class="max-w-xl text-muted-foreground">
-          Most "bespoke" signature schemes aren't. Nine families cover almost
-          every provider — and once a family ships, each new provider is a
-          header name, an encoding, and a test fixture.
+          Stripe, GitHub, Discord, Twilio, Google Pub/Sub, and every
+          Svix-backed vendor work out of the box. Yours isn't there? Most
+          schemes are a dozen lines with
+          <code class="rounded bg-background px-1 py-0.5 font-mono text-xs">createHmacProvider</code>.
         </p>
         <div class="flex flex-col gap-3 sm:flex-row">
           <a
             href="/docs/providers"
             class="rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
           >
-            See the scheme families
+            Find your provider
           </a>
           <a
             href="/docs/providers/custom"
             class="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-background"
           >
-            Build a provider
+            Build your own
           </a>
         </div>
       </div>

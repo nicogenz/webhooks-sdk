@@ -57,7 +57,12 @@ export interface WebhookHandler<TEvents extends EventMap = EventMap> {
   fetch(request: Request): Promise<Response>
 }
 
-function toResponse(result: WebhookResult): Response {
+/**
+ * Converts a `process()` result into the `Response` that `handler.fetch`
+ * would produce. Exported for adapters that read the request themselves but
+ * still respond with a Web-standard `Response`.
+ */
+export function toResponse(result: WebhookResult): Response {
   if (result.response) return result.response
 
   if (result.error) {

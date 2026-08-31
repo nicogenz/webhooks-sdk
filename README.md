@@ -185,6 +185,9 @@ if (!result.ok) {
 |--------|-----|
 | `handler.fetch` | Anything Web-standard: Next.js App Router, Workers, Deno, Bun, Remix |
 | `webhooks-sdk/next` | `export const { POST } = toNextRoute(handler)` |
+| `webhooks-sdk/nuxt` | `export default defineEventHandler(toNuxtHandler(handler))` |
+| `webhooks-sdk/nitro` | `toNitroHandler(handler)` for Nitro routes (Analog, SolidStart, TanStack Start) |
+| `webhooks-sdk/h3` | `toH3Handler(handler)` for plain h3 — all three are the same adapter |
 | `webhooks-sdk/hono` | `app.post('/hook', toHonoHandler(handler))` |
 | `webhooks-sdk/express` | `toExpressHandler(handler)`, plus `captureRawBody` |
 | `webhooks-sdk/node` | `toNodeHandler(handler)` for bare `node:http` and the Pages Router |
