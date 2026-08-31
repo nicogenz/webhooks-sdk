@@ -1,6 +1,6 @@
 {
   "name": "webhooks-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "One way to verify, parse, and route webhooks from every provider.",
   "keywords": [
     "webhook",
