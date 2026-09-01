@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.3...v0.1.4) (2026-09-01)
+
+
+### Features
+
+* add resend provider ([#8](https://github.com/nicogenz/webhooks-sdk/issues/8)) ([3d2a965](https://github.com/nicogenz/webhooks-sdk/commit/3d2a965ea4a9416f77e2c21ab4faa3f785e45d24))
+* promote clerk, polar and replicate to documented providers ([#10](https://github.com/nicogenz/webhooks-sdk/issues/10)) ([ef5cb1a](https://github.com/nicogenz/webhooks-sdk/commit/ef5cb1a5fc2204241b8c19f1c4666b34472a769a))
+
 ## [0.1.3](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.2...v0.1.3) (2026-08-31)
 
 
