@@ -1,0 +1,101 @@
+---
+title: Replicate
+description: Verify and handle Replicate webhooks — prediction status updates from starting to succeeded, failed, or canceled.
+---
+
+Pass a `webhook` URL when you create a prediction, fetch your account's
+signing secret, and handle prediction statuses by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { replicate } from 'webhooks-sdk/replicate'
+
+const handler = createWebhookHandler({
+  provider: replicate({ secret: process.env.REPLICATE_WEBHOOK_SIGNING_SECRET! }),
+  on: {
+    succeeded: async (event) => {
+      await store(event.payload.id, event.payload.output)
+    },
+    failed: async (event) => {
+      await report(event.payload.id, event.payload.error)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is account-wide rather than per-endpoint, and lives behind the API
+instead of a dashboard page:
+
+```bash
+curl -s -H "Authorization: Bearer $REPLICATE_API_TOKEN" \
+  https://api.replicate.com/v1/webhooks/default/secret
+# {"key": "whsec_..."}
+```
+
+Replicate signs with [Standard Webhooks](/docs/providers/standard-webhooks)
+over the spec's `webhook-*` headers — the id and timestamp are inside the
+signed material, so a replayed request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events are statuses, not types
+
+The webhook body is the prediction object itself — there is no `type` field.
+The event name is the prediction's `status`:
+
+`starting` · `processing` · `succeeded` · `failed` · `canceled` — plus
+`aborted`, for a prediction that exceeded its deadline before it could start.
+
+These autocomplete in the `on` map; any other string still routes. Which
+deliveries arrive is set per prediction by `webhook_events_filter` — `start`,
+`output`, `logs`, `completed` — defaulting to `output` and `completed`.
+`output` and `logs` fire repeatedly during the run, throttled to at most one
+request per 500ms, so a handler for a non-terminal status must expect the
+same status more than once; dedupe on `event.id`, which is unique per
+delivery. Only the terminal delivery is retried on failure; intermediate
+ones are not.
+
+## The payload is the whole prediction
+
+Unlike vendors that send a thin pointer, Replicate delivers the prediction in
+the same shape the predictions API returns — `id`, `status`, `input`,
+`output`, `error`, `logs`, `metrics`, and the timestamps. No re-fetch needed:
+
+```ts
+succeeded: async (event) => {
+  const { id, output, metrics } = event.payload
+},
+```
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical
+  [idempotency](/docs/concepts/idempotency) key, unique per delivery.
+- `event.type` — the prediction's `status`.
+- `event.timestamp` — the signed `webhook-timestamp`.
+- `event.payload` — the prediction object; the result is at
+  `payload.output`.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'replicate'` and
+`eventType: 'status'`, so the standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw, { eventType: 'status' }) — the envelope
+  signStandardWebhook,    // (body, secret) — all three webhook-* headers, for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+`signStandardWebhook`'s default `webhook-*` header names are exactly what
+Replicate sends. See [Testing](/docs/guides/testing).

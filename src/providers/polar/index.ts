@@ -1,30 +1,72 @@
 import type { WebhookProvider } from '../../core/provider.js'
 import type { EventMap } from '../../core/types.js'
+import { toBase64, utf8 } from '../../crypto/encoding.js'
 import { standardWebhooks } from '../standard-webhooks/index.js'
 
-export interface PolarEvents extends EventMap {
-  'checkout.created': unknown
-  'checkout.updated': unknown
-  'order.created': unknown
-  'order.paid': unknown
-  'order.refunded': unknown
-  'subscription.created': unknown
-  'subscription.updated': unknown
-  'subscription.active': unknown
-  'subscription.canceled': unknown
-  'subscription.uncanceled': unknown
-  'subscription.revoked': unknown
-  'customer.created': unknown
-  'customer.updated': unknown
-  'customer.deleted': unknown
-  'benefit_grant.created': unknown
-  'benefit_grant.revoked': unknown
+/**
+ * The envelope Polar puts on the wire. `data` is the full resource — a
+ * checkout, order, subscription, and so on — identified by `id`.
+ */
+export interface PolarEventPayload {
+  type: string
+  /** ISO datetime of when the event occurred. */
+  timestamp: string
+  data: { id?: string; [key: string]: unknown }
 }
+
+export interface PolarEvents extends EventMap {
+  'checkout.created': PolarEventPayload
+  'checkout.updated': PolarEventPayload
+  'checkout.expired': PolarEventPayload
+  'customer.created': PolarEventPayload
+  'customer.updated': PolarEventPayload
+  'customer.deleted': PolarEventPayload
+  'customer.state_changed': PolarEventPayload
+  'subscription.created': PolarEventPayload
+  'subscription.updated': PolarEventPayload
+  'subscription.active': PolarEventPayload
+  'subscription.canceled': PolarEventPayload
+  'subscription.uncanceled': PolarEventPayload
+  'subscription.revoked': PolarEventPayload
+  'subscription.cycled': PolarEventPayload
+  'subscription.past_due': PolarEventPayload
+  'subscription.paused': PolarEventPayload
+  'subscription.resumed': PolarEventPayload
+  'order.created': PolarEventPayload
+  'order.updated': PolarEventPayload
+  'order.paid': PolarEventPayload
+  'order.refunded': PolarEventPayload
+  'refund.created': PolarEventPayload
+  'refund.updated': PolarEventPayload
+  'benefit.created': PolarEventPayload
+  'benefit.updated': PolarEventPayload
+  'benefit_grant.created': PolarEventPayload
+  'benefit_grant.updated': PolarEventPayload
+  'benefit_grant.revoked': PolarEventPayload
+  'product.created': PolarEventPayload
+  'product.updated': PolarEventPayload
+  'discount.created': PolarEventPayload
+  'discount.updated': PolarEventPayload
+  'discount.deleted': PolarEventPayload
+  'organization.updated': PolarEventPayload
+}
+
+/**
+ * Polar's dashboard secret is a raw string — no `whsec_` prefix, not base64 —
+ * while the Standard Webhooks scheme keys on base64-decoded bytes. Polar's own
+ * SDK bridges that by base64-encoding the secret before verifying; this
+ * wrapper does the same, so the secret is passed exactly as the dashboard
+ * shows it.
+ */
+const encodeSecret = (secret: string) => toBase64(utf8(secret))
 
 /** Polar. Standard Webhooks over the spec's `webhook-*` headers. */
 export function polar(options: {
   secret: string | string[]
   tolerance?: number
 }): WebhookProvider<PolarEvents> {
-  return standardWebhooks<PolarEvents>({ ...options, id: 'polar', name: 'Polar' })
+  const secret = Array.isArray(options.secret)
+    ? options.secret.map(encodeSecret)
+    : encodeSecret(options.secret)
+  return standardWebhooks<PolarEvents>({ ...options, secret, id: 'polar', name: 'Polar' })
 }

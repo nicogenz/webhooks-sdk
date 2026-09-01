@@ -1,0 +1,104 @@
+---
+title: Polar
+description: Verify and handle Polar webhooks — checkout, order, subscription, customer, and benefit events.
+---
+
+Create the endpoint under **Settings → Webhooks** in your Polar organization,
+pass its secret, and handle events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { polar } from 'webhooks-sdk/polar'
+
+const handler = createWebhookHandler({
+  provider: polar({ secret: process.env.POLAR_WEBHOOK_SECRET! }),
+  on: {
+    'order.paid': async (event) => {
+      await fulfill(event.payload.data.id)
+    },
+    'subscription.revoked': async (event) => {
+      await revokeAccess(event.payload.data.id)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the value you set — or generate — when creating the endpoint.
+Pass it exactly as the dashboard shows it; see [the secret is raw](#the-secret-is-raw-not-whsec_)
+below. Polar signs with [Standard Webhooks](/docs/providers/standard-webhooks)
+over the spec's `webhook-*` headers — the id and timestamp are inside the
+signed material, so a replayed request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The endpoint's secret, verbatim from the dashboard. Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`checkout.created` · `checkout.updated` · `checkout.expired` ·
+`customer.created` · `customer.updated` · `customer.deleted` ·
+`customer.state_changed` · `subscription.created` · `subscription.updated` ·
+`subscription.active` · `subscription.canceled` · `subscription.uncanceled` ·
+`subscription.revoked` · `subscription.cycled` · `subscription.past_due` ·
+`subscription.paused` · `subscription.resumed` · `order.created` ·
+`order.updated` · `order.paid` · `order.refunded` · `refund.created` ·
+`refund.updated` · `benefit.created` · `benefit.updated` ·
+`benefit_grant.created` · `benefit_grant.updated` · `benefit_grant.revoked` ·
+`product.created` · `product.updated` · `discount.created` ·
+`discount.updated` · `discount.deleted` · `organization.updated`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type Polar adds later is handled without an SDK update.
+
+## The secret is raw, not `whsec_`
+
+Unlike most Standard Webhooks vendors, Polar's endpoint secret is a plain
+string — no `whsec_` prefix, no base64. The spec keys on base64-decoded
+bytes, so the wrapper base64-encodes the secret for you, the same bridge
+Polar's own SDK makes. Pass the dashboard value verbatim; encoding it
+yourself makes every delivery fail as a bad signature. The generic
+`standardWebhooks({ id: 'polar' })` provider does **not** make this bridge —
+use the wrapper.
+
+## Pick the Raw payload format
+
+An endpoint can deliver in Raw, Discord, or Slack format — and pasting a
+Discord or Slack webhook URL switches the format automatically. Only **Raw**
+is the JSON envelope this provider parses; the other two are for posting
+notifications into chat channels, not for verification.
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical
+  [idempotency](/docs/concepts/idempotency) key.
+- `event.type` — the body's `type`.
+- `event.timestamp` — the signed `webhook-timestamp` header. The body's own
+  `timestamp` is an ISO string of when the event occurred, which can be
+  earlier than the delivery.
+- `event.payload` — `{ type, timestamp, data }`; `data` is the full
+  resource — a checkout, order, subscription — identified by
+  `payload.data.id`. No re-fetch needed.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'polar'`, so the
+standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw) — the envelope
+  signStandardWebhook,    // (body, secret) — all three webhook-* headers, for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+The standalone helpers implement the spec, so they expect the base64 form the
+wrapper produces internally — hand them
+`Buffer.from(secret).toString('base64')` to match Polar's wire signatures.
+See [Testing](/docs/guides/testing).

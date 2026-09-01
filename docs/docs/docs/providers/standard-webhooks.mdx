@@ -28,9 +28,11 @@ Five vendors ship as typed one-line wrappers:
     ```ts
     import { clerk } from 'webhooks-sdk/clerk'
 
-    clerk({ secret: process.env.CLERK_WEBHOOK_SECRET! })
+    clerk({ secret: process.env.CLERK_WEBHOOK_SIGNING_SECRET! })
     // event types: user.created, session.created, organization.updated, …
     ```
+
+    [Full page →](/docs/providers/clerk)
   </Tab>
   <Tab title="Polar">
     ```ts
@@ -39,14 +41,18 @@ Five vendors ship as typed one-line wrappers:
     polar({ secret: process.env.POLAR_WEBHOOK_SECRET! })
     // event types: order.paid, subscription.active, checkout.created, …
     ```
+
+    [Full page →](/docs/providers/polar)
   </Tab>
   <Tab title="Replicate">
     ```ts
     import { replicate } from 'webhooks-sdk/replicate'
 
-    replicate({ secret: process.env.REPLICATE_WEBHOOK_SECRET! })
-    // event types are prediction statuses: starting, processing, succeeded, failed, canceled
+    replicate({ secret: process.env.REPLICATE_WEBHOOK_SIGNING_SECRET! })
+    // event types are prediction statuses: starting, processing, succeeded, failed, canceled, …
     ```
+
+    [Full page →](/docs/providers/replicate)
   </Tab>
   <Tab title="OpenAI">
     ```ts

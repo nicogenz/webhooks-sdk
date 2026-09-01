@@ -284,17 +284,53 @@ describe('vendor wrappers', () => {
     expect(handled).toHaveBeenCalledWith('resp_1')
   })
 
-  it('clerk and polar reuse the same scheme with their own slug', async () => {
-    for (const [provider, slug] of [
-      [clerk({ secret: SECRET }), 'clerk'],
-      [polar({ secret: SECRET }), 'polar'],
-    ] as const) {
-      const result = await createWebhookHandler({ provider, now: () => NOW }).process(
-        await signed(),
-      )
-      expect(result.ok).toBe(true)
-      expect(result.event?.provider).toBe(slug)
-    }
+  it('clerk verifies over svix-* headers and dispatches', async () => {
+    const body = JSON.stringify({
+      object: 'event',
+      type: 'user.created',
+      timestamp: NOW.getTime(),
+      instance_id: 'ins_1',
+      data: { id: 'user_1' },
+    })
+    const handled = vi.fn()
+    const handler = createWebhookHandler({
+      provider: clerk({ secret: SECRET }),
+      now: () => NOW,
+      on: {
+        'user.created': async (event) => handled(event.payload.data.id),
+      },
+    })
+
+    const result = await handler.process(await signed({ body, headerPrefix: 'svix' }))
+    expect(result.event?.provider).toBe('clerk')
+    expect(handled).toHaveBeenCalledWith('user_1')
+  })
+
+  it('polar takes the dashboard secret verbatim — raw, not whsec_/base64', async () => {
+    const dashboardSecret = 'polar-dashboard-secret'
+    const body = JSON.stringify({
+      type: 'order.paid',
+      timestamp: NOW.toISOString(),
+      data: { id: 'order_1' },
+    })
+    const handled = vi.fn()
+    const handler = createWebhookHandler({
+      provider: polar({ secret: dashboardSecret }),
+      now: () => NOW,
+      on: {
+        'order.paid': async (event) => handled(event.payload.data.id),
+      },
+    })
+
+    // Polar signs with the raw secret string as the key bytes; handing
+    // signStandardWebhook the base64 of that string reproduces its wire
+    // signature exactly.
+    const result = await handler.process(
+      await signed({ body, secret: toBase64(utf8(dashboardSecret)) }),
+    )
+    expect(result.ok).toBe(true)
+    expect(result.event?.provider).toBe('polar')
+    expect(handled).toHaveBeenCalledWith('order_1')
   })
 
   it('replicate takes its event name from status, not type', async () => {
