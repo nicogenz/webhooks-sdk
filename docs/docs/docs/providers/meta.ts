@@ -11,6 +11,7 @@ export default defineMeta({
     "twilio",
     "google-pubsub",
     "openai",
+    "resend",
     "standard-webhooks",
     "custom",
   ],
