@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { toBase64, utf8 } from '../src/crypto/index.js'
 import { createWebhookHandler } from '../src/index.js'
 import { clerk } from '../src/providers/clerk/index.js'
+import { dodoPayments } from '../src/providers/dodo-payments/index.js'
 import { loops } from '../src/providers/loops/index.js'
 import { openai } from '../src/providers/openai/index.js'
 import { polar } from '../src/providers/polar/index.js'
@@ -369,5 +370,27 @@ describe('vendor wrappers', () => {
     expect(result.event?.provider).toBe('loops')
     expect(result.event?.type).toBe('contact.created')
     expect(handled).toHaveBeenCalledWith('test@example.com')
+  })
+
+  it('dodo payments verifies over the spec webhook-* headers and dispatches', async () => {
+    const body = JSON.stringify({
+      business_id: 'bus_1',
+      type: 'payment.succeeded',
+      timestamp: NOW.toISOString(),
+      data: { payload_type: 'Payment', payment_id: 'pay_1', total_amount: 2999 },
+    })
+    const handled = vi.fn()
+    const handler = createWebhookHandler({
+      provider: dodoPayments({ secret: SECRET }),
+      now: () => NOW,
+      on: {
+        'payment.succeeded': async (event) => handled(event.payload.data.payment_id),
+      },
+    })
+
+    const result = await handler.process(await signed({ body }))
+    expect(result.event?.provider).toBe('dodo-payments')
+    expect(result.event?.type).toBe('payment.succeeded')
+    expect(handled).toHaveBeenCalledWith('pay_1')
   })
 })

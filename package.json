@@ -45,6 +45,7 @@
     "./replicate": "./dist/providers/replicate/index.js",
     "./openai": "./dist/providers/openai/index.js",
     "./loops": "./dist/providers/loops/index.js",
+    "./dodo-payments": "./dist/providers/dodo-payments/index.js",
     "./testing": "./dist/testing/index.js",
     "./next": "./dist/adapters/next.js",
     "./nuxt": "./dist/adapters/h3.js",

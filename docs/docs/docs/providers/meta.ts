@@ -15,6 +15,7 @@ export default defineMeta({
     "loops",
     "clerk",
     "polar",
+    "dodo-payments",
     "replicate",
     "standard-webhooks",
     "custom",
