@@ -1,0 +1,84 @@
+---
+title: Resend
+description: Verify and handle Resend webhooks — email delivery, engagement, contact, domain, and suppression events.
+---
+
+Create the endpoint under [Webhooks](https://resend.com/webhooks) in the
+Resend dashboard, pass its signing secret, and handle events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { resend } from 'webhooks-sdk/resend'
+
+const handler = createWebhookHandler({
+  provider: resend({ secret: process.env.RESEND_WEBHOOK_SECRET! }),
+  on: {
+    'email.delivered': async (event) => {
+      await markDelivered(event.payload.data.email_id)
+    },
+    'email.bounced': async (event) => {
+      await suppress(event.payload.data.email_id)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the `whsec_…` value on the endpoint's page in the dashboard.
+Resend signs with [Standard Webhooks](/docs/providers/standard-webhooks)
+over the legacy `svix-*` headers — the id and timestamp are inside the
+signed material, so a replayed request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`email.sent` · `email.scheduled` · `email.delivered` ·
+`email.delivery_delayed` · `email.bounced` · `email.complained` ·
+`email.failed` · `email.opened` · `email.clicked` · `email.received` ·
+`email.suppressed` · `contact.created` · `contact.updated` ·
+`contact.deleted` · `domain.created` · `domain.updated` ·
+`domain.deleted` · `suppression.added` · `suppression.removed`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type Resend adds later is handled without an SDK update.
+
+Two of them are easy to conflate: `email.suppressed` fires when a specific
+send is suppressed, `suppression.added` when an address lands on your
+suppression list — after a hard bounce or spam complaint, or manually.
+
+## The envelope
+
+- `event.id` — the `svix-id` header, the canonical
+  [idempotency](/docs/concepts/idempotency) key. The body has no top-level
+  id of its own.
+- `event.type` — the body's `type`.
+- `event.timestamp` — the signed `svix-timestamp` header. The body's
+  `created_at` is an ISO string of when the event occurred, which can be
+  earlier than the delivery.
+- `event.payload` — `{ type, created_at, data }`. Email events name the
+  send in `data.email_id`; contact, domain, and suppression events name the
+  resource in `data.id`.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'resend'`, so the
+standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw) — the envelope
+  signStandardWebhook,    // (body, secret, { headerPrefix: 'svix' }) — for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+Pass `headerPrefix: 'svix'` to `signStandardWebhook` to produce the header
+names Resend actually sends. See [Testing](/docs/guides/testing).

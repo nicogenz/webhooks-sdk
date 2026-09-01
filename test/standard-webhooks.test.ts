@@ -251,12 +251,14 @@ describe('vendor wrappers', () => {
     const handler = createWebhookHandler({
       provider: resend({ secret: SECRET }),
       now: () => NOW,
-      on: { 'email.delivered': handled },
+      on: {
+        'email.delivered': async (event) => handled(event.payload.data.email_id),
+      },
     })
 
     const result = await handler.process(await signed({ headerPrefix: 'svix' }))
     expect(result.event?.provider).toBe('resend')
-    expect(handled).toHaveBeenCalledOnce()
+    expect(handled).toHaveBeenCalledWith('e_1')
   })
 
   it('openai verifies over the spec webhook-* headers and dispatches', async () => {
