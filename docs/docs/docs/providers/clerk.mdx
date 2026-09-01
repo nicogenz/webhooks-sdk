@@ -1,0 +1,104 @@
+---
+title: Clerk
+description: Verify and handle Clerk webhooks — user, session, organization, and billing events.
+---
+
+Create the endpoint on the [Webhooks
+page](https://dashboard.clerk.com/last-active?path=webhooks) in the Clerk
+Dashboard, pass its signing secret, and handle events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { clerk } from 'webhooks-sdk/clerk'
+
+const handler = createWebhookHandler({
+  provider: clerk({ secret: process.env.CLERK_WEBHOOK_SIGNING_SECRET! }),
+  on: {
+    'user.created': async (event) => {
+      await syncUser(event.payload.data.id)
+    },
+    'session.revoked': async (event) => {
+      await dropSession(event.payload.data.id)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the `whsec_…` value shown when you select the endpoint on the
+Webhooks page. Clerk delivers through Svix and signs with [Standard
+Webhooks](/docs/providers/standard-webhooks) over the legacy `svix-*`
+headers — the id and timestamp are inside the signed material, so a replayed
+request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`user.created` · `user.updated` · `user.deleted` · `session.created` ·
+`session.ended` · `session.removed` · `session.revoked` · `email.created` ·
+`sms.created` · `organization.created` · `organization.updated` ·
+`organization.deleted` · `organizationDomain.created` ·
+`organizationDomain.updated` · `organizationDomain.deleted` ·
+`organizationInvitation.created` · `organizationInvitation.accepted` ·
+`organizationInvitation.revoked` · `organizationMembership.created` ·
+`organizationMembership.updated` · `organizationMembership.deleted` ·
+`role.created` · `role.updated` · `role.deleted` · `permission.created` ·
+`permission.updated` · `permission.deleted` · `waitlistEntry.created` ·
+`waitlistEntry.updated` · `paymentAttempt.created` ·
+`paymentAttempt.updated` · `subscription.created` · `subscription.updated` ·
+`subscription.active` · `subscription.pastDue` · `subscriptionItem.created` ·
+`subscriptionItem.updated` · `subscriptionItem.active` ·
+`subscriptionItem.canceled` · `subscriptionItem.upcoming` ·
+`subscriptionItem.ended` · `subscriptionItem.abandoned` ·
+`subscriptionItem.incomplete` · `subscriptionItem.pastDue` ·
+`subscriptionItem.freeTrialEnding`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type Clerk adds later is handled without an SDK update. The
+authoritative list for your instance is the **Event Catalog** tab on the
+endpoint in the Clerk Dashboard. The `subscription.*`, `subscriptionItem.*`,
+and `paymentAttempt.*` families are Clerk Billing events.
+
+Mind the casing: multi-word resources are camelCase on the wire —
+`organizationMembership.created`, `waitlistEntry.updated`,
+`subscription.pastDue`, `subscriptionItem.freeTrialEnding`. Those are Clerk's
+own strings, kept verbatim because they must match the wire.
+
+## Two timestamps, two units
+
+The body's `timestamp` is **milliseconds** since the epoch, while the signed
+`svix-timestamp` header is seconds. `event.timestamp` is built from the
+header, so use it — or divide before comparing the two.
+
+## The envelope
+
+- `event.id` — the `svix-id` header, the canonical
+  [idempotency](/docs/concepts/idempotency) key.
+- `event.type` — the body's `type`.
+- `event.timestamp` — the signed `svix-timestamp` header.
+- `event.payload` — `{ data, object: 'event', type, timestamp, instance_id }`;
+  the affected resource is `payload.data`, identified by `payload.data.id`.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'clerk'`, so the
+standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw) — the envelope
+  signStandardWebhook,    // (body, secret, { headerPrefix: 'svix' }) — for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+Pass `headerPrefix: 'svix'` to `signStandardWebhook` to produce the header
+names Clerk actually sends. See [Testing](/docs/guides/testing).
