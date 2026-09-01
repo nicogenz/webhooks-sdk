@@ -7,9 +7,9 @@ sidebar:
 
 Shipping today: **Stripe**, **GitHub**, **Discord**, **Twilio**,
 **Google Pub/Sub** (which also carries Gmail push, Play RTDN, and Workspace
-Events), **OpenAI**, **Resend**, **Clerk**, **Polar**, **Replicate**, and
-**Standard Webhooks** — the last of which covers every other Svix-backed
-vendor.
+Events), **OpenAI**, **Resend**, **Loops**, **Clerk**, **Polar**,
+**Replicate**, and **Standard Webhooks** — the last of which covers every
+other Svix-backed vendor.
 
 <CardGroup cols={2}>
   <Card title="Stripe" href="/docs/providers/stripe" icon="stripe">
@@ -33,6 +33,9 @@ vendor.
   <Card title="Resend" href="/docs/providers/resend" icon="resend">
     Email delivery, engagement, contact, and domain events.
   </Card>
+  <Card title="Loops" href="/docs/providers/loops" icon="loops">
+    Contact, mailing list, email send, and engagement events.
+  </Card>
   <Card title="Clerk" href="/docs/providers/clerk" icon="clerk">
     User, session, organization, and billing events.
   </Card>
@@ -43,7 +46,7 @@ vendor.
     Prediction status updates, from starting to succeeded.
   </Card>
   <Card title="Standard Webhooks" href="/docs/providers/standard-webhooks" icon="webhook">
-    Loops, Dodo Payments, Stytch, Svix — one spec.
+    Dodo Payments, Stytch, Svix — one spec.
   </Card>
 </CardGroup>
 
@@ -52,10 +55,10 @@ Any Standard Webhooks vendor without a named wrapper works right now:
 ```ts
 import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
 
-standardWebhooks({ id: 'loops', secret: process.env.LOOPS_WEBHOOK_SECRET! })
+standardWebhooks({ id: 'dodo-payments', secret: process.env.DODO_PAYMENTS_WEBHOOK_SECRET! })
 ```
 
-That covers Loops, Dodo Payments, Stytch, and Svix itself.
+That covers Dodo Payments, Stytch, and Svix itself.
 
 ## Scheme families
 
@@ -69,7 +72,7 @@ verifies, and whether it's replay-safe on its own or needs an
 |---|--------|--------------|------------------------|----------|
 | 1 | **HMAC over raw body** | `HMAC(secret, rawBody)`, hex or base64, in one header | ❌ — pair with an [idempotency store](/docs/concepts/idempotency) | GitHub, Shopify, Lemon Squeezy, Sentry |
 | 2 | **HMAC over timestamp + body** | `HMAC(secret, "{ts}.{body}")`, timestamp sent alongside | ✅ | Stripe, Paddle, Slack, WorkOS |
-| 3 | **Standard Webhooks / Svix** | `HMAC(base64(secret), "{id}.{ts}.{body}")`, versioned `v1,…` list | ✅ | Resend, Clerk, Polar, OpenAI |
+| 3 | **Standard Webhooks / Svix** | `HMAC(base64(secret), "{id}.{ts}.{body}")`, versioned `v1,…` list | ✅ | Resend, Clerk, Polar, Loops, OpenAI |
 | 4 | **Ed25519** | Public-key signature over `ts + body`; no shared secret to leak | ✅ | Discord |
 | 5 | **JWT / JWKS** | Signed token in a header, verified against a rotating public key set | ✅ (via `exp`) | Google Pub/Sub, Plaid, Wix |
 | 6 | **X.509 cert chain** | RSA signature; fetch and validate the signing cert from the provider | ✅ | PayPal, AWS SNS |
