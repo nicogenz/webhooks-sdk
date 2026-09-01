@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.4...v0.1.5) (2026-09-01)
+
+
+### Features
+
+* add dodo payments provider ([#13](https://github.com/nicogenz/webhooks-sdk/issues/13)) ([180a254](https://github.com/nicogenz/webhooks-sdk/commit/180a254fd0313549e8659aecea05d3a618c9a372))
+* add loops provider ([#11](https://github.com/nicogenz/webhooks-sdk/issues/11)) ([b2765e8](https://github.com/nicogenz/webhooks-sdk/commit/b2765e89f1bf45794b473fab281e0864d4356e71))
+
 ## [0.1.4](https://github.com/nicogenz/webhooks-sdk/compare/v0.1.3...v0.1.4) (2026-09-01)
 
 
