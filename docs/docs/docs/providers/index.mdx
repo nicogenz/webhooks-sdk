@@ -8,8 +8,8 @@ sidebar:
 Shipping today: **Stripe**, **GitHub**, **Discord**, **Twilio**,
 **Google Pub/Sub** (which also carries Gmail push, Play RTDN, and Workspace
 Events), **OpenAI**, **Resend**, **Loops**, **Clerk**, **Polar**,
-**Replicate**, and **Standard Webhooks** — the last of which covers every
-other Svix-backed vendor.
+**Dodo Payments**, **Replicate**, and **Standard Webhooks** — the last of
+which covers every other Svix-backed vendor.
 
 <CardGroup cols={2}>
   <Card title="Stripe" href="/docs/providers/stripe" icon="stripe">
@@ -42,11 +42,14 @@ other Svix-backed vendor.
   <Card title="Polar" href="/docs/providers/polar" icon="polar">
     Checkout, order, subscription, and benefit events.
   </Card>
+  <Card title="Dodo Payments" href="/docs/providers/dodo-payments" icon="dodo-payments">
+    Payment, subscription, refund, dispute, and payout events.
+  </Card>
   <Card title="Replicate" href="/docs/providers/replicate" icon="replicate">
     Prediction status updates, from starting to succeeded.
   </Card>
   <Card title="Standard Webhooks" href="/docs/providers/standard-webhooks" icon="webhook">
-    Dodo Payments, Stytch, Svix — one spec.
+    Stytch, Svix itself, and any other Svix-backed vendor — one spec.
   </Card>
 </CardGroup>
 
@@ -55,10 +58,10 @@ Any Standard Webhooks vendor without a named wrapper works right now:
 ```ts
 import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
 
-standardWebhooks({ id: 'dodo-payments', secret: process.env.DODO_PAYMENTS_WEBHOOK_SECRET! })
+standardWebhooks({ id: 'svix', secret: process.env.SVIX_WEBHOOK_SECRET! })
 ```
 
-That covers Dodo Payments, Stytch, and Svix itself.
+That covers Stytch and Svix itself.
 
 ## Scheme families
 

@@ -1,6 +1,6 @@
 ---
 title: Standard Webhooks
-description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate, OpenAI, Loops ship as wrappers; everything else works generically.
+description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate, OpenAI, Loops, Dodo Payments ship as wrappers; everything else works generically.
 ---
 
 Resend, Clerk, Polar, Replicate, OpenAI, Loops, Dodo Payments — and every
@@ -11,7 +11,7 @@ whichever signature flavor it uses (symmetric `v1` or Ed25519 `v1a`).
 
 ## Named wrappers
 
-Six vendors ship as typed one-line wrappers:
+Seven vendors ship as typed one-line wrappers:
 
 <Tabs>
   <Tab title="Resend">
@@ -74,6 +74,16 @@ Six vendors ship as typed one-line wrappers:
 
     [Full page →](/docs/providers/loops)
   </Tab>
+  <Tab title="Dodo Payments">
+    ```ts
+    import { dodoPayments } from 'webhooks-sdk/dodo-payments'
+
+    dodoPayments({ secret: process.env.DODO_PAYMENTS_WEBHOOK_KEY! })
+    // event types: payment.succeeded, subscription.active, refund.succeeded, …
+    ```
+
+    [Full page →](/docs/providers/dodo-payments)
+  </Tab>
 </Tabs>
 
 Each takes `{ secret, tolerance? }` and adds typed event names, plus the
@@ -88,10 +98,10 @@ A vendor without a wrapper doesn't need one:
 ```ts
 import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
 
-standardWebhooks({ id: 'dodo-payments', secret: process.env.DODO_PAYMENTS_WEBHOOK_SECRET! })
+standardWebhooks({ id: 'svix', secret: process.env.SVIX_WEBHOOK_SECRET! })
 ```
 
-That covers Dodo Payments, Stytch, and Svix itself — and any
+That covers Stytch and Svix itself — and any
 vendor whose docs mention `whsec_` secrets or `svix-*`/`webhook-*` headers.
 
 ## Options

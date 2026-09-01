@@ -1,0 +1,134 @@
+---
+title: Dodo Payments
+description: Verify and handle Dodo Payments webhooks — payment, subscription, refund, dispute, license key, credit, and payout events.
+---
+
+Create the endpoint under **Developer → Webhooks** in the Dodo Payments
+dashboard, copy the signing secret from its **Overview** tab, and handle
+events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { dodoPayments } from 'webhooks-sdk/dodo-payments'
+
+const handler = createWebhookHandler({
+  provider: dodoPayments({ secret: process.env.DODO_PAYMENTS_WEBHOOK_KEY! }),
+  on: {
+    'payment.succeeded': async (event) => {
+      await fulfil(event.payload.data.payment_id)
+    },
+    'subscription.cancelled': async (event) => {
+      await revokeAccess(event.payload.data.subscription_id)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+`DODO_PAYMENTS_WEBHOOK_KEY` is the name Dodo's own SDKs and deploy guides use
+for the secret; pass it verbatim. Dodo Payments signs with [Standard
+Webhooks](/docs/providers/standard-webhooks) over the spec's `webhook-*`
+headers — the id and timestamp are inside the signed material, so a replayed
+request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The signing secret(s) from the endpoint's Overview tab. Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`payment.succeeded` · `payment.failed` · `payment.processing` ·
+`payment.cancelled` · `refund.succeeded` · `refund.failed` ·
+`dispute.opened` · `dispute.expired` · `dispute.accepted` ·
+`dispute.cancelled` · `dispute.challenged` · `dispute.won` · `dispute.lost` ·
+`subscription.active` · `subscription.updated` · `subscription.on_hold` ·
+`subscription.paused` · `subscription.unpaused` · `subscription.renewed` ·
+`subscription.plan_changed` · `subscription.update_payment_method` ·
+`subscription.cancelled` · `subscription.failed` · `subscription.expired` ·
+`license_key.created` · `entitlement_grant.created` ·
+`entitlement_grant.delivered` · `entitlement_grant.failed` ·
+`entitlement_grant.revoked` · `credit.added` · `credit.deducted` ·
+`credit.expired` · `credit.rolled_over` · `credit.rollover_forfeited` ·
+`credit.overage_charged` · `credit.overage_reset` ·
+`credit.manual_adjustment` · `credit.balance_low` ·
+`abandoned_checkout.detected` · `abandoned_checkout.recovered` ·
+`dunning.started` · `dunning.recovered` · `payout.created` ·
+`payout.in_progress` · `payout.on_hold` · `payout.success` · `payout.failed`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type Dodo adds later is handled without an SDK update. The **Event
+catalog** tab under Developer → Webhooks shows each event's schema and an
+example payload.
+
+Mind three spellings: it's `cancelled` with two `l`s throughout, the payout
+success event is `payout.success` (not `succeeded`, unlike
+`payment.succeeded`), and the payment-method event is
+`subscription.update_payment_method`. Those are Dodo's own strings, kept
+verbatim because they must match the wire. `payout.created` used to be
+emitted as `payout.not_initiated`; the old name is retired.
+
+## The payload is the resource, as it is now
+
+`data` is the full resource — a payment, subscription, refund, dispute, and so
+on — with `payload_type` naming which kind and the id named after it:
+`data.payment_id`, `data.subscription_id`, `data.dispute_id`,
+`data.payout_id`. Two consequences:
+
+- **It's the current state, not a snapshot.** Dodo sends the latest version
+  of the resource at delivery time, however long ago the event was emitted.
+  A retried event that lands hours later carries the resource as it is then,
+  so read the state from the payload rather than inferring it from the event
+  name.
+- **Events can arrive out of order**, and a failed delivery is retried up to
+  eight times over roughly 27 hours. Payout events in particular are neither
+  terminal nor ordered: `payout.failed` can follow `payout.success` when a
+  bank returns the transfer. [Idempotency](/docs/concepts/idempotency) by
+  `event.id` dedupes retries of one delivery, not the sequence.
+
+`subscription.updated` fires on every field change and is the cheapest way to
+keep a local copy in sync without polling. Dodo waits 15 seconds for a `2xx`
+before counting the attempt as failed, so keep handlers quick or hand off.
+
+## Rotating the secret
+
+**Rotate secret** on the endpoint's Overview tab replaces the secret at once;
+the old one keeps verifying for 24 hours and then fails. Pass both as an
+array until the new value is deployed everywhere.
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical
+  [idempotency](/docs/concepts/idempotency) key. The body has no id of its
+  own.
+- `event.type` — the body's `type`.
+- `event.timestamp` — the signed `webhook-timestamp` header. The body's
+  `timestamp` is an ISO 8601 string of when the event occurred, which can be
+  earlier than the delivery.
+- `event.payload` — `{ business_id, type, timestamp, data }`; the resource is
+  `payload.data`, its kind in `payload.data.payload_type`.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'dodo-payments'`, so
+the standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw) — the envelope
+  signStandardWebhook,    // (body, secret) — all three webhook-* headers, for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+`signStandardWebhook`'s default `webhook-*` header names are exactly what
+Dodo sends. The **Testing** tab on the endpoint sends a sample payload for
+any event type, signed like a real delivery. Of the CLI's two commands,
+`dodo wh listen` forwards real, signed test-mode events to a local port with
+headers intact, while `dodo wh trigger` sends **unsigned** mocks — those fail
+verification here by design; sign your own fixtures with
+`signStandardWebhook` instead. See [Testing](/docs/guides/testing).
