@@ -1,6 +1,6 @@
 ---
 title: Standard Webhooks
-description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate, OpenAI ship as wrappers; everything else works generically.
+description: One spec, dozens of vendors — Resend, Clerk, Polar, Replicate, OpenAI, Loops ship as wrappers; everything else works generically.
 ---
 
 Resend, Clerk, Polar, Replicate, OpenAI, Loops, Dodo Payments — and every
@@ -11,7 +11,7 @@ whichever signature flavor it uses (symmetric `v1` or Ed25519 `v1a`).
 
 ## Named wrappers
 
-Five vendors ship as typed one-line wrappers:
+Six vendors ship as typed one-line wrappers:
 
 <Tabs>
   <Tab title="Resend">
@@ -64,10 +64,22 @@ Five vendors ship as typed one-line wrappers:
 
     [Full page →](/docs/providers/openai)
   </Tab>
+  <Tab title="Loops">
+    ```ts
+    import { loops } from 'webhooks-sdk/loops'
+
+    loops({ secret: process.env.LOOPS_SIGNING_SECRET! })
+    // event types: contact.created, email.delivered, email.hardBounced, …
+    ```
+
+    [Full page →](/docs/providers/loops)
+  </Tab>
 </Tabs>
 
-Each takes `{ secret, tolerance? }` and adds typed event names — nothing
-else differs from the generic provider.
+Each takes `{ secret, tolerance? }` and adds typed event names, plus the
+one per-vendor deviation where there is one — Replicate's and Loops'
+event-name fields, Polar's raw secret. Nothing else differs from the generic
+provider.
 
 ## Any other vendor, right now
 
@@ -76,10 +88,10 @@ A vendor without a wrapper doesn't need one:
 ```ts
 import { standardWebhooks } from 'webhooks-sdk/standard-webhooks'
 
-standardWebhooks({ id: 'loops', secret: process.env.LOOPS_WEBHOOK_SECRET! })
+standardWebhooks({ id: 'dodo-payments', secret: process.env.DODO_PAYMENTS_WEBHOOK_SECRET! })
 ```
 
-That covers Loops, Dodo Payments, Stytch, and Svix itself — and any
+That covers Dodo Payments, Stytch, and Svix itself — and any
 vendor whose docs mention `whsec_` secrets or `svix-*`/`webhook-*` headers.
 
 ## Options
@@ -109,7 +121,8 @@ fails closed instead of breaking you.
 
 - `event.id` — the `webhook-id` header, the spec's canonical dedup key.
 - `event.type` — the body's `type` field by default; override with
-  `eventType` (Replicate's wrapper, for instance, uses the `status` field).
+  `eventType` (Replicate's wrapper uses the `status` field, Loops' uses
+  `eventName`).
 - `event.timestamp` — the signed `webhook-timestamp`.
 
 ## Standalone & testing

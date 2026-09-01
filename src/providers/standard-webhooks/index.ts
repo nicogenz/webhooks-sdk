@@ -52,7 +52,8 @@ export interface StandardWebhooksOptions {
   name?: string
   /**
    * Where the event name lives in the body. Defaults to `type`, which is what
-   * most vendors use; Replicate uses `status`, Stytch uses `action`.
+   * most vendors use; Replicate uses `status`, Loops uses `eventName`, Stytch
+   * uses `action`.
    */
   eventType?: string | ((payload: unknown) => string | undefined)
 }

@@ -12,6 +12,7 @@ export default defineMeta({
     "google-pubsub",
     "openai",
     "resend",
+    "loops",
     "clerk",
     "polar",
     "replicate",

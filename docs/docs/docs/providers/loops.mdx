@@ -1,0 +1,136 @@
+---
+title: Loops
+description: Verify and handle Loops webhooks — contact, mailing list, email send, and engagement events.
+---
+
+Add your endpoint under [Settings → Webhooks](https://app.loops.so/settings?page=webhooks)
+in Loops, pass the signing secret it shows you, and handle events by name:
+
+```ts
+import { createWebhookHandler } from 'webhooks-sdk'
+import { loops } from 'webhooks-sdk/loops'
+
+const handler = createWebhookHandler({
+  provider: loops({ secret: process.env.LOOPS_SIGNING_SECRET! }),
+  on: {
+    'contact.created': async (event) => {
+      await syncContact(event.payload.contactIdentity.email)
+    },
+    'email.hardBounced': async (event) => {
+      await suppress(event.payload.contactIdentity.email)
+    },
+  },
+})
+
+export const POST = handler.fetch
+```
+
+The secret is the `whsec_…` value shown next to the endpoint URL. Loops signs
+with [Standard Webhooks](/docs/providers/standard-webhooks) over the spec's
+`webhook-*` headers — the id and timestamp are inside the signed material, so
+a replayed request is rejected on its own.
+
+## Options
+
+| Option | Type | Default | |
+|--------|------|---------|---|
+| `secret` | `string \| string[]` | — | The `whsec_…` signing secret(s). Pass an array during [rotation](/docs/guides/secret-rotation). |
+| `tolerance` | `number` | `300` | Replay window in seconds. |
+
+## Events
+
+`contact.created` · `contact.unsubscribed` · `contact.deleted` ·
+`contact.mailingList.subscribed` · `contact.mailingList.unsubscribed` ·
+`campaign.email.sent` · `loop.email.sent` · `transactional.email.sent` ·
+`email.delivered` · `email.softBounced` · `email.hardBounced` ·
+`email.opened` · `email.clicked` · `email.unsubscribed` ·
+`email.resubscribed` · `email.spamReported` · `testing.testEvent`
+
+These autocomplete in the `on` map; any other string still routes, so an
+event type Loops adds later is handled without an SDK update.
+
+Mind the casing: multi-word segments are camelCase on the wire —
+`email.softBounced`, `email.spamReported`, `contact.mailingList.subscribed`.
+Those are Loops' own strings, kept verbatim because they must match the wire.
+
+## The event name is `eventName`, and there is no `data`
+
+Loops' body is flat. The event name lives in `eventName` rather than `type` —
+the wrapper reads it from there, which is the one thing it does beyond the
+generic provider — and the context objects sit at the top level instead of
+under a `data` key:
+
+- `payload.contactIdentity` — `{ id, email, userId }`, on every event except
+  the test event. Fetch the full contact through the API when you need more.
+- `payload.contact` — the full contact including custom properties, on
+  `contact.created` only.
+- `payload.email` — `{ id, emailMessageId, subject }` on every send and
+  engagement event. The campaign, workflow, or transactional email it belongs
+  to is in `campaignId`, `loopId`, or `transactionalId` beside it; the
+  `email.*` events also carry `sourceType`.
+- `payload.mailingList` on the `contact.mailingList.*` events;
+  `payload.mailingLists` (an array) on campaign and workflow sends addressed
+  to lists.
+
+Loops renamed loops to workflows in May 2026 but kept the payload strings for
+compatibility: the send event is still `loop.email.sent`, the ids are
+`loopId` and `loopName`, and a workflow email's `sourceType` is `"loop"`.
+
+## One action, several events
+
+Loops fans some actions out into more than one event, each with its own
+`webhook-id`, so [idempotency](/docs/concepts/idempotency) won't collapse them
+— pick the one you act on:
+
+- A hard bounce unsubscribes the contact, so `email.hardBounced` is followed
+  by `contact.unsubscribed`.
+- An unsubscribe link sends `email.unsubscribed` plus either
+  `contact.unsubscribed` or `contact.mailingList.unsubscribed`, depending on
+  whether the email went to a mailing list.
+- Deleting a contact sends `contact.deleted` and `contact.unsubscribed`.
+- Campaign and workflow sends fire once **per recipient** — a campaign to
+  1,000 contacts is 1,000 `campaign.email.sent` events, delivered at most 10
+  per second.
+
+`email.opened`, `email.clicked`, `email.unsubscribed`, and `email.resubscribed`
+never fire for transactional emails, which Loops doesn't track.
+
+## Rotating the secret
+
+Rolling the secret in the dashboard keeps the previous one valid for 24 hours,
+and during that window Loops sends a signature for each secret in the header.
+Either secret verifies on its own, so swap the env var whenever it suits you —
+or pass both as an array and not think about it. Loops allows one webhook
+endpoint per account.
+
+## The envelope
+
+- `event.id` — the `webhook-id` header, the spec's canonical
+  [idempotency](/docs/concepts/idempotency) key. The body has no id of its
+  own.
+- `event.type` — the body's `eventName`.
+- `event.timestamp` — the signed `webhook-timestamp` header. The body's
+  `eventTime` is also seconds since the epoch, but marks when the event
+  occurred in Loops, which can be earlier than the delivery.
+- `event.payload` — the flat body: `{ eventName, eventTime,
+  webhookSchemaVersion }` plus the context objects above.
+  `webhookSchemaVersion` is `1.0.0` for every event.
+
+## Standalone & testing
+
+The wrapper is the [Standard Webhooks
+provider](/docs/providers/standard-webhooks) with `id: 'loops'` and
+`eventType: 'eventName'`, so the standalone triple lives there:
+
+```ts
+import {
+  verifyStandardWebhook,  // (raw, { secret }) — throws on failure
+  parseStandardWebhook,   // (raw, { eventType: 'eventName' }) — the envelope
+  signStandardWebhook,    // (body, secret) — all three webhook-* headers, for tests
+} from 'webhooks-sdk/standard-webhooks'
+```
+
+`signStandardWebhook`'s default `webhook-*` header names are exactly what
+Loops sends. The Webhooks settings page can also send a real, signed
+`testing.testEvent` to your endpoint — handle it or let it route as
+unhandled. See [Testing](/docs/guides/testing).
